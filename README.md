@@ -1,9 +1,35 @@
-# https-github.com-project-DeMartino
+# Commodity Volatility Forecasting Under Armed Conflict
 
-This project investigates whether armed conflicts contain predictive information for commodity price volatility. Using daily data for major commodities (crude oil, natural gas, gold, and an agricultural commodity index), the study examines how geopolitical shocks related to armed conflicts affect volatility dynamics. Commodity prices are transformed into realized volatility measures computed over a rolling 21-day window, providing a robust proxy for market risk.
+This project studies whether armed-conflict information contains predictive signals for commodity price volatility. Using daily data for major commodities (WTI crude oil futures, natural gas futures, gold futures, and an agricultural commodity index), the project compares standard econometric benchmarks (e.g., GARCH) with machine-learning models that incorporate conflict-event characteristics.
 
-Conflict-related information is drawn from the Uppsala Conflict Data Program (UCDP) Georeferenced Event Dataset, which offers detailed daily data on the timing, location, and intensity of armed conflict events. These variables are used to construct geopolitical features capturing potential structural breaks and regime shifts in volatility.
+## Research question
+Do conflict characteristics (timing, location, intensity) improve out-of-sample forecasts of commodity volatility, especially around major conflict-related regime breaks?
 
-Methodologically, the project compares standard econometric benchmarks, including a naive volatility model and GARCH(1,1), with machine-learning approaches such as Random Forest and Gradient Boosting models. All models are evaluated in a strictly out-of-sample framework using loss functions tailored to volatility forecasting (RMSE and QLIKE), along with Diebold–Mariano tests to assess the statistical significance of performance differences.
+## Data
+### Commodity prices (daily)
+- WTI Crude Oil futures
+- Natural Gas futures
+- Gold futures
+- S&P GSCI Agriculture index (aggregated agricultural exposure)
 
-The objective is to determine whether incorporating conflict-related information improves volatility forecasts, particularly around major geopolitical disruptions, and to assess the extent to which more flexible machine-learning models outperform traditional approaches in capturing abrupt changes in commodity market risk.
+Source: Investing.com (downloaded as raw CSV and cleaned with a reproducible Python script).
+
+### Conflict events (daily, georeferenced)
+- UCDP Georeferenced Event Dataset (GED) v25.1
+
+Conflict intensity is proxied using the `best` fatalities estimate.
+
+## Target variable
+For each commodity, daily log-returns are computed:
+\[
+r_t = \log(P_t) - \log(P_{t-1})
+\]
+
+Realized volatility (proxy for variance) is constructed over a 21-day rolling window:
+\[
+RV_t^{(21)} = \sum_{i=0}^{20} r_{t-i}^2
+\]
+
+This realized volatility serves as the ex post benchmark against which forecasts are evaluated.
+
+## Repository structure (planned)
