@@ -21,14 +21,12 @@ Conflict intensity is proxied using the `best` fatalities estimate.
 
 ## Target variable
 For each commodity, daily log-returns are computed:
-\[
 r_t = \log(P_t) - \log(P_{t-1})
-\]
 
 Realized volatility (proxy for variance) is constructed over a 21-day rolling window:
-\[
+
 RV_t^{(21)} = \sum_{i=0}^{20} r_{t-i}^2
-\]
+
 
 This realized volatility serves as the ex post benchmark against which forecasts are evaluated.
 
