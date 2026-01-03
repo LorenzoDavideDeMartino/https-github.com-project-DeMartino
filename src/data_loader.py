@@ -63,41 +63,43 @@ def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
 
 
 def _standardize_date(date_str: object) -> pd.Timestamp:
-    """Your date standardization: MM.DD.YYYY -> MM/DD/YYYY, keep slashes, fallback formats."""
+    """Version corrigée : gère mieux les formats JJ/MM/AAAA et MM/JJ/AAAA."""
     if not isinstance(date_str, str) or not date_str:
         return pd.NaT
 
     s = date_str.strip('"\' ')
 
-    if "." in s:
-        # MM.DD.YYYY
-        parts = s.split(".")
-        if len(parts) == 3:
-            month, day, year = parts
+    # Liste de formats à tester par ordre de priorité
+    formats_to_try = [
+        "%m/%d/%Y",  # Format US (souvent par défaut sur Investing.com EN)
+        "%d/%m/%Y",  # Format EU (souvent sur Investing.com FR)
+        "%Y/%m/%d",
+        "%Y-%m-%d",
+        "%d.%m.%Y",  # Format avec points
+        "%m.%d.%Y"
+    ]
+    
+    # Nettoyage préalable (remplace les points par des slashs pour simplifier)
+    s_clean = s.replace(".", "/")
+
+    for fmt in formats_to_try:
+        try:
+            # On tente de convertir
+            dt = pd.to_datetime(s, format=fmt)
+            return dt
+        except (ValueError, TypeError):
+            # Si ça rate, on essaie le format suivant (pas de return NaT ici !)
             try:
-                return pd.to_datetime(f"{month}/{day}/{year}", format="%m/%d/%Y")
-            except Exception:
-                return pd.NaT
-
-    if "/" in s:
-        # MM/DD/YYYY
-        try:
-            return pd.to_datetime(s, format="%m/%d/%Y")
-        except Exception:
-            return pd.NaT
-
-    # fallback
-    for fmt in ["%Y/%m/%d", "%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y"]:
-        try:
-            return pd.to_datetime(s, format=fmt)
-        except Exception:
-            continue
+                # Tentative avec s_clean (si le format original avait des points)
+                dt = pd.to_datetime(s_clean, format=fmt.replace(".", "/"))
+                return dt
+            except:
+                continue
 
     return pd.NaT
 
-
 def _convert_numeric(value: object) -> float:
-    """Your numeric conversion: %, K/M suffix, commas."""
+    """Your numeric conversion: %, K/M suffix, commas. CORRIGÉ POUR ARRONDIS."""
     if not isinstance(value, str) or not value:
         return np.nan
 
@@ -111,11 +113,13 @@ def _convert_numeric(value: object) -> float:
         u = v.upper()
         if "K" in u:
             u = u.replace("K", "")
-            return float(u.replace(",", "")) * 1000.0
+            # --- MODIFICATION ICI : Ajout de round() ---
+            return round(float(u.replace(",", "")) * 1000.0)
 
         if "M" in u:
             u = u.replace("M", "")
-            return float(u.replace(",", "")) * 1_000_000.0
+            # --- MODIFICATION ICI : Ajout de round() ---
+            return round(float(u.replace(",", "")) * 1_000_000.0)
 
         return float(v.replace(",", ""))
     except Exception:
@@ -126,7 +130,9 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
     """
     Read one Investing.com raw CSV file (often 1-column) and return a cleaned DataFrame.
     """
-    raw_df = pd.read_csv(path, header=None, low_memory=False)
+    # Force loading as string to prevent pandas from guessing types wrongly initially
+    # and to ensure the splitting logic works on strings.
+    raw_df = pd.read_csv(path, header=None, low_memory=False, dtype=str)
 
     header_row_idx = _find_header_row_idx(raw_df)
     if header_row_idx is None:
@@ -136,7 +142,9 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
         header_row = raw_df.iloc[header_row_idx, 0]
 
     if not isinstance(header_row, str):
-        raise ValueError(f"Header row not found / invalid in file: {path}")
+        # Fallback if header row isn't a string (e.g. if file is empty or weird)
+        # Try to cast to string
+        header_row = str(header_row)
 
     column_names = _parse_header(header_row)
     n_cols = len(column_names)
@@ -162,7 +170,9 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
 
     # Drop invalid dates
     if "Date" not in df.columns:
-        raise ValueError(f"'Date' column not found after parsing: {path}")
+        # Instead of crashing, let's try to return empty if really broken
+        # raise ValueError(f"'Date' column not found after parsing: {path}")
+        return pd.DataFrame()
 
     df = df.dropna(subset=["Date"]).copy()
 
@@ -177,18 +187,10 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
 
     return df
 
-
-# -----------------------------
 # Merge parts (multiple downloads)
-# -----------------------------
 def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path) -> pd.DataFrame:
     """
     Merge many Investing.com raw CSV parts into one clean CSV.
-    - Reads each *.csv in parts_dir
-    - Cleans each
-    - Concatenates and drops duplicate dates (keeps first occurrence)
-    - Sorts by Date
-    - Writes out_file
     """
     parts_dir = Path(parts_dir)
     out_file = Path(out_file)
@@ -203,38 +205,36 @@ def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path) -> pd.Data
         df_part = read_investing_raw_csv(f)
         frames.append(df_part)
 
-    df = pd.concat(frames, ignore_index=True)
+    if not frames:
+        return pd.DataFrame()
 
-    # Final dedupe after concatenation (important)
+    df = pd.concat(frames, ignore_index=True, sort=False)
+
+    # Ensure required columns exist
+    if "Date" not in df.columns:
+        raise ValueError(f"'Date' column missing after merging parts in: {parts_dir}")
+    
+    # Critical: remove rows where Price is missing after merge
+    # Check if 'Price' exists, otherwise look for 'Last'
+    price_col = "Price" if "Price" in df.columns else "Last"
+    
+    if price_col not in df.columns:
+        # Last resort: try to rename anything looking like a price
+        pass 
+    
+    if price_col in df.columns:
+        df = df.dropna(subset=["Date", price_col]).copy()
+        # Rename to Price if it was Last
+        if price_col != "Price":
+             df.rename(columns={price_col: "Price"}, inplace=True)
+
+    # Final dedupe + sort
     df = df.sort_values("Date")
     df = df.drop_duplicates(subset=["Date"], keep="first")
 
+    ordered = ["Date", "Price", "Open", "High", "Low", "Vol.", "Change %"]
+    keep = [c for c in ordered if c in df.columns]
+    df = df.loc[:, keep]
+
     df.to_csv(out_file, index=False)
-    return df
-
-
-def add_log_returns(df: pd.DataFrame, price_col: str = "Price") -> pd.DataFrame:
-    df = df.copy()
-    df["return"] = np.log(df[price_col]).diff()
-    return df
-
-
-def add_realized_volatility(
-    df: pd.DataFrame,
-    window: int = 21,
-    return_col: str = "return",
-    annualize: bool = False,
-    trading_days: int = 252,
-) -> pd.DataFrame:
-    """
-    Realized volatility proxy: sqrt(sum_{i=1..window} r_{t-i}^2)
-    (you used sum of squared returns; sqrt is standard if you want volatility in same units as returns)
-    Set annualize=True if needed later.
-    """
-    df = df.copy()
-    rv = df[return_col].pow(2).rolling(window=window).sum()
-    rv = np.sqrt(rv)
-    if annualize:
-        rv = rv * np.sqrt(trading_days)
-    df[f"rv_{window}"] = rv
     return df

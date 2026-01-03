@@ -1,4 +1,24 @@
+# .gitignore
+
+# --- Python & System ---
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
 .DS_Store
+.vscode/
+.env
+.ipynb_checkpoints/
+
+# --- DATA EXCLUSION RULES ---
+
+# 1. IGNORE large conflict files (UCDP dataset exceeds GitHub 100MB limit)
+data/raw/conflicts/*.csv
+data/raw/conflicts/GEDEvent*.csv
+
+# 2. IGNORE Excel files (often temporary or duplicates)
+*.xlsx
+
+# 3. Note: Raw commodities (Gold, Oil, Gas) in 'data/raw/commodities/' 
+# are intentionally NOT ignored so they can be pushed to GitHub.
+
+# Keep folder structure even if folders are empty
+!data/.gitkeep
