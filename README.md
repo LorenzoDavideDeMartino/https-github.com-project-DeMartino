@@ -24,49 +24,35 @@ To ensure economic relevance and reduce noise, conflict data are later filtered 
 
 ## Target variable
 For each commodity, daily log-returns are computed as:
-        rt​=log(𝑃𝑡​)−log(𝑃𝑡−1​)
+
+- rt​=log(𝑃𝑡​)−log(𝑃𝑡−1​)
+
 where 𝑃𝑡 denotes the daily futures price. 
 
 Realized volatility is constructed as a proxy for the conditional variance using a rolling window of 21 trading days:
 
-RVt(21)​=i=0∑20​rt−i2​
+- RVt(21)​=i=0∑20​rt−i2​
 
 This realized volatility measure is observed ex post and serves as the benchmark against which all volatility forecasts—both econometric and machine-learning based—are evaluated.
 
-## Methodological Overview
+## Project Structure
 
-The empirical strategy follows a strict out-of-sample forecasting framework:
+The repository is organized to ensure reproducibility, clarity, and modularity.
 
-### Benchmark models
-Standard econometric models, such as GARCH(1,1), are estimated using past returns only.
-
-### Machine-learning models
-Flexible models (e.g. Random Forests, Gradient Boosting) incorporate both traditional market variables and conflict-related features.
-
-### Conflict information
-Conflict data are transformed into daily indicators capturing event frequency and intensity, with geographic filters tailored to each commodity.
-
-### Evaluation
-Forecast accuracy is assessed using loss functions suitable for volatility forecasting (e.g. QLIKE, MSE) and compared across models.
-
-## Repository structure 
-The repository is organized to ensure reproducibility, clarity, and modularity. 
-
+```text
 commodity-volatility-conflict/
 ├── README.md                  # Project overview and instructions
-├── PROPOSAL.md                # Project proposal (300–500 words)
-├── main.py                    # Entry point (must run without errors)
+├── PROPOSAL.md                # Project proposal
+├── main.py                    # Orchestrator script (ETL Pipeline)
 ├── requirements.txt           # Python dependencies
-├── environment.yml            # Conda environment (optional)
 │
 ├── src/
 │   ├── __init__.py
 │   ├── data_loader.py         # Cleaning & merging raw commodity price data
-│   ├── features.py            # Returns and realized volatility construction
 │   ├── conflict_loader.py     # Cleaning & reducing UCDP GED data
-│   ├── conflict_features.py   # Conflict-based feature engineering
-│   ├── models.py              # Econometric and ML models (to be implemented)
-│   └── evaluation.py          # Forecast evaluation and comparison
+│   ├── features.py            # Returns and realized volatility construction
+│   ├── models.py              # (Upcoming) Econometric and ML models
+│   └── evaluation.py          # (Upcoming) Forecast evaluation
 │
 ├── data/
 │   ├── raw/
@@ -77,11 +63,7 @@ commodity-volatility-conflict/
 │       ├── features/          # Volatility features
 │       └── conflicts/         # Cleaned and aggregated conflict data
 │
-├── results/
-│   ├── figures/               # Plots and visualizations
-│   └── tables/                # Forecast evaluation results
-│
-└── notebooks/                 # Exploratory analysis (optional)
+└── results/                   # (Upcoming) Figures and tables
 
 ### Reproducibility
 
