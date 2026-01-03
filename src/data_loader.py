@@ -8,35 +8,109 @@
 # Output: one clean CSV per commodity with columns:
 # Date, Price, Open, High, Low, Vol., Change %
 #
-# Usage is typically from main.py via build_clean_commodity_from_parts().
+# src/data_loader.py
+# Build clean commodity price series from Investing.com "raw" CSV parts.
+# Robust version: Handles ambiguous dates (US default) and numeric cleaning.
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import List, Optional
+import warnings
 
 import numpy as np
 import pandas as pd
 
+# -----------------------------
+# 1. Numeric & Date Cleaning
+# -----------------------------
+
+def _convert_numeric(value: object) -> float:
+    """
+    Robust numeric conversion (US format with ',' for thousands).
+    Handles %, K, M suffixes and rounds volumes to avoid floating point errors.
+    """
+    if not isinstance(value, str) or not value:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return np.nan
+
+    try:
+        v = value.strip()
+        if "%" in v:
+            v = v.replace("%", "")
+            return float(v.replace(",", ""))
+
+        u = v.upper()
+        if "K" in u:
+            u = u.replace("K", "")
+            return round(float(u.replace(",", "")) * 1000.0)
+
+        if "M" in u:
+            u = u.replace("M", "")
+            return round(float(u.replace(",", "")) * 1_000_000.0)
+
+        return float(v.replace(",", ""))
+    except Exception:
+        return np.nan
+
+def _standardize_date(date_str: object) -> pd.Timestamp:
+    """
+    Parses a date string with smart handling of US/EU ambiguity.
+    
+    Logic:
+    1. Clean string (replace '.' with '/').
+    2. If 1st part > 12 (e.g., 13/01) -> Must be Day -> EU Format (DD/MM/YYYY).
+    3. If 2nd part > 12 (e.g., 01/25) -> Must be Day -> US Format (MM/DD/YYYY).
+    4. If ambiguous (e.g., 01/02) -> Default to US (MM/DD/YYYY) as per Investing.com standard.
+    """
+    if not isinstance(date_str, str) or not date_str:
+        return pd.NaT
+
+    # 1. Preliminary cleaning
+    s = date_str.strip('"\' ').replace(".", "/")
+    
+    try:
+        parts = s.split('/')
+        if len(parts) != 3:
+            # Try default parsing if structure is unexpected
+            return pd.to_datetime(s, errors='coerce')
+        
+        p0, p1 = int(parts[0]), int(parts[1])
+
+        # 2. Logic detection
+        if p0 > 12:
+            # First part > 12 implies it is a Day. Format is EU.
+            return pd.to_datetime(s, format="%d/%m/%Y")
+        
+        elif p1 > 12:
+            # Second part > 12 implies it is a Day. Format is US.
+            return pd.to_datetime(s, format="%m/%d/%Y")
+        
+        else:
+            # Ambiguous (e.g., 01/02). Default to US format.
+            return pd.to_datetime(s, format="%m/%d/%Y")
+            
+    except (ValueError, TypeError):
+        return pd.NaT
 
 # -----------------------------
-# Core parsing (your logic)
+# 2. Raw CSV Parsing
 # -----------------------------
+
 def _find_header_row_idx(raw_df: pd.DataFrame) -> Optional[int]:
-    """Find row index containing header (string with 'Date')."""
+    """Find row index containing the header (looking for 'Date')."""
     for idx, row in raw_df.iterrows():
         v = row.iloc[0]
         if isinstance(v, str) and "Date" in v:
             return idx
     return None
 
-
 def _parse_header(header_row: str) -> List[str]:
     return [col.strip('"\' ') for col in header_row.split(",")]
 
-
 def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
-    """Split one CSV-like line while respecting quotes."""
+    """Split a raw CSV line handling quotes properly."""
     if not isinstance(row_str, str):
         return [None] * n_cols
 
@@ -56,84 +130,23 @@ def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
     if current:
         values.append(current.strip('"\' '))
 
-    # pad / trim
     if len(values) < n_cols:
         values.extend([None] * (n_cols - len(values)))
     return values[:n_cols]
 
-
-def _standardize_date(date_str: object) -> pd.Timestamp:
-    """Version corrigée : gère mieux les formats JJ/MM/AAAA et MM/JJ/AAAA."""
-    if not isinstance(date_str, str) or not date_str:
-        return pd.NaT
-
-    s = date_str.strip('"\' ')
-
-    # Liste de formats à tester par ordre de priorité
-    formats_to_try = [
-        "%m/%d/%Y",  # Format US (souvent par défaut sur Investing.com EN)
-        "%d/%m/%Y",  # Format EU (souvent sur Investing.com FR)
-        "%Y/%m/%d",
-        "%Y-%m-%d",
-        "%d.%m.%Y",  # Format avec points
-        "%m.%d.%Y"
-    ]
-    
-    # Nettoyage préalable (remplace les points par des slashs pour simplifier)
-    s_clean = s.replace(".", "/")
-
-    for fmt in formats_to_try:
-        try:
-            # On tente de convertir
-            dt = pd.to_datetime(s, format=fmt)
-            return dt
-        except (ValueError, TypeError):
-            # Si ça rate, on essaie le format suivant (pas de return NaT ici !)
-            try:
-                # Tentative avec s_clean (si le format original avait des points)
-                dt = pd.to_datetime(s_clean, format=fmt.replace(".", "/"))
-                return dt
-            except:
-                continue
-
-    return pd.NaT
-
-def _convert_numeric(value: object) -> float:
-    """Your numeric conversion: %, K/M suffix, commas. CORRIGÉ POUR ARRONDIS."""
-    if not isinstance(value, str) or not value:
-        return np.nan
-
-    try:
-        v = value.strip()
-
-        if "%" in v:
-            v = v.replace("%", "")
-            return float(v.replace(",", ""))
-
-        u = v.upper()
-        if "K" in u:
-            u = u.replace("K", "")
-            # --- MODIFICATION ICI : Ajout de round() ---
-            return round(float(u.replace(",", "")) * 1000.0)
-
-        if "M" in u:
-            u = u.replace("M", "")
-            # --- MODIFICATION ICI : Ajout de round() ---
-            return round(float(u.replace(",", "")) * 1_000_000.0)
-
-        return float(v.replace(",", ""))
-    except Exception:
-        return np.nan
-
-
 def read_investing_raw_csv(path: Path) -> pd.DataFrame:
     """
-    Read one Investing.com raw CSV file (often 1-column) and return a cleaned DataFrame.
+    Reads a raw Investing.com CSV file.
+    Prints a warning if the file is unusable.
     """
-    # Force loading as string to prevent pandas from guessing types wrongly initially
-    # and to ensure the splitting logic works on strings.
-    raw_df = pd.read_csv(path, header=None, low_memory=False, dtype=str)
+    # Force read as string to handle bad formatting
+    try:
+        raw_df = pd.read_csv(path, header=None, low_memory=False, dtype=str)
+    except pd.errors.EmptyDataError:
+        print(f"WARNING: Empty file ignored -> {path.name}")
+        return pd.DataFrame()
 
+    # Find Header
     header_row_idx = _find_header_row_idx(raw_df)
     if header_row_idx is None:
         header_row_idx = 0
@@ -142,13 +155,12 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
         header_row = raw_df.iloc[header_row_idx, 0]
 
     if not isinstance(header_row, str):
-        # Fallback if header row isn't a string (e.g. if file is empty or weird)
-        # Try to cast to string
         header_row = str(header_row)
 
     column_names = _parse_header(header_row)
     n_cols = len(column_names)
 
+    # Parse rows
     data_rows: List[List[Optional[str]]] = []
     for idx, row in raw_df.iterrows():
         if idx == header_row_idx:
@@ -160,37 +172,51 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
 
     df = pd.DataFrame(data_rows, columns=column_names)
 
-    # Clean types
-    if "Date" in df.columns:
-        df["Date"] = df["Date"].apply(_standardize_date)
+    # Standardize column names
+    rename_map = {
+        "Last": "Price", "Dernier": "Price",
+        "Vol.": "Vol.", "Volume": "Vol.",
+        "Var. %": "Change %"
+    }
+    df = df.rename(columns=rename_map)
 
-    for col in ["Price", "Open", "High", "Low", "Vol.", "Change %"]:
+    # Critical Check
+    if "Date" not in df.columns:
+        print(f"WARNING: 'Date' column not found in -> {path.name} (Columns found: {df.columns.tolist()})")
+        return pd.DataFrame()
+
+    # Conversions
+    df["Date"] = df["Date"].apply(_standardize_date)
+
+    cols_numeric = ["Price", "Open", "High", "Low", "Vol.", "Change %"]
+    for col in cols_numeric:
         if col in df.columns:
             df[col] = df[col].apply(_convert_numeric)
 
-    # Drop invalid dates
-    if "Date" not in df.columns:
-        # Instead of crashing, let's try to return empty if really broken
-        # raise ValueError(f"'Date' column not found after parsing: {path}")
-        return pd.DataFrame()
-
+    # Final Cleaning
+    # Drop rows without Date
     df = df.dropna(subset=["Date"]).copy()
+    
+    # Drop rows without Price (Volume can be missing, but Price is mandatory)
+    if "Price" in df.columns:
+         df = df.dropna(subset=["Price"])
 
-    # Sort / drop duplicate dates (keep first)
     df = df.sort_values("Date")
     df = df.drop_duplicates(subset=["Date"], keep="first")
-
-    # Keep canonical column order if present
+    
+    # Keep canonical order
     ordered = ["Date", "Price", "Open", "High", "Low", "Vol.", "Change %"]
     keep = [c for c in ordered if c in df.columns]
-    df = df.loc[:, keep]
+    
+    return df.loc[:, keep]
 
-    return df
+# -----------------------------
+# 3. Main Pipeline
+# -----------------------------
 
-# Merge parts (multiple downloads)
 def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path) -> pd.DataFrame:
     """
-    Merge many Investing.com raw CSV parts into one clean CSV.
+    Merges all CSV parts from a folder into a single clean file.
     """
     parts_dir = Path(parts_dir)
     out_file = Path(out_file)
@@ -203,32 +229,19 @@ def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path) -> pd.Data
     frames: List[pd.DataFrame] = []
     for f in files:
         df_part = read_investing_raw_csv(f)
-        frames.append(df_part)
+        if not df_part.empty:
+            frames.append(df_part)
 
     if not frames:
+        print(f"ERROR: No valid data extracted from {parts_dir}")
         return pd.DataFrame()
 
     df = pd.concat(frames, ignore_index=True, sort=False)
 
-    # Ensure required columns exist
     if "Date" not in df.columns:
-        raise ValueError(f"'Date' column missing after merging parts in: {parts_dir}")
+        raise ValueError(f"'Date' column lost after merge in: {parts_dir}")
     
-    # Critical: remove rows where Price is missing after merge
-    # Check if 'Price' exists, otherwise look for 'Last'
-    price_col = "Price" if "Price" in df.columns else "Last"
-    
-    if price_col not in df.columns:
-        # Last resort: try to rename anything looking like a price
-        pass 
-    
-    if price_col in df.columns:
-        df = df.dropna(subset=["Date", price_col]).copy()
-        # Rename to Price if it was Last
-        if price_col != "Price":
-             df.rename(columns={price_col: "Price"}, inplace=True)
-
-    # Final dedupe + sort
+    # Final Dedupe
     df = df.sort_values("Date")
     df = df.drop_duplicates(subset=["Date"], keep="first")
 
