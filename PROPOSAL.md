@@ -35,4 +35,3 @@ Model performance is evaluated strictly out-of-sample using a walk-forward valid
 ## Expected Contribution
 
 This project aims to contribute to the literature by providing a rigorous, out-of-sample comparison between econometric and machine-learning approaches to volatility forecasting in the presence of armed conflicts. By exploiting high-frequency conflict-event data, the study seeks to clarify whether geopolitical information delivers incremental predictive power beyond standard market indicators, particularly during periods of heightened instability.
-
