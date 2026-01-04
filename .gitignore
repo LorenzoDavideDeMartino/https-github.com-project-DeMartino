@@ -22,3 +22,21 @@ data/raw/conflicts/GEDEvent*.csv
 
 # Keep folder structure even if folders are empty
 !data/.gitkeep
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Environment
+.env
+venv/
+.venv/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS specific
+.DS_Store
+Thumbs.db

@@ -1,0 +1,18 @@
+# Data Manipulation
+pandas
+numpy
+
+# Visualization
+matplotlib
+seaborn
+
+# Econometrics (GARCH models)
+arch
+
+# Machine Learning & Statistics
+scikit-learn
+xgboost
+statsmodels
+
+# Optional: To read Excel files if needed later
+openpyxl
