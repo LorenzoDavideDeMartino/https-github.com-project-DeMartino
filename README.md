@@ -3,7 +3,35 @@
 This project studies whether armed-conflict information contains predictive signals for commodity price volatility. Using daily data for major commodities (WTI crude oil futures, natural gas futures, gold futures), the project compares standard econometric benchmarks (e.g., GARCH) with machine-learning models that incorporate conflict-event characteristics.
 
 ## Research question
-Do armed-conflict characteristics (timing, location, intensity) contain predictive information that improves out-of-sample forecasts of commodity price volatility compared to standard econometric benchmarks?
+Do armed-conflict characteristics (timing, location, and intensity) contain predictive information that improves out-of-sample forecasts of commodity price volatility compared to standard econometric benchmarks?
+
+## Hypotheses 
+
+### H1 — Conflict Intensity and Volatility
+- H1: The intensity of armed conflicts contains relevant information for the future dynamics of commodity price volatility.
+
+Conflict intensity is proxied by the number of fatalities reported in the UCDP dataset (best variable). To reduce skewness and capture persistence, fatalities are transformed using a logarithmic transformation and smoothed via an exponentially weighted moving average (EWMA).
+
+This hypothesis tests whether conflict intensity has predictive power independently of geographical location, using global conflict indices.
+
+### H2 — Role of Geographic Exposure
+- H2: The impact of conflict intensity on commodity volatility depends on the geographical location of the conflict and is stronger when conflicts affect regions that are economically relevant for the production or strategic importance of the commodity.
+
+Specifically:
+- WTI crude oil: conflicts in the Middle East
+- Natural gas: conflicts in Europe
+- Gold: global conflicts (safe-haven asset)
+
+This hypothesis motivates the use of region-specific conflict indices rather than purely global measures for certain commodities.
+
+### H3 — Structural Breaks and Model Adaptability
+- H3: Major armed conflicts represent structural breaks in the volatility process, and augmented or more flexible models are better able to capture these changes than standard linear benchmarks.
+
+This hypothesis motivates:
+- the comparison between HAR and HAR-X models (econometric framework),
+- and, in a second step, the use of more complex or non-linear models.
+
+The objective is not to maximize predictive performance mechanically, but to assess whether richer models better adapt to volatility dynamics following large geopolitical shocks.
 
 ## Data
 ### Commodity prices (daily)
@@ -44,11 +72,19 @@ This quantity is not observable at time t and is therefore suitable for out-of-s
 
 ## Conflict indices and features
 
-Armed-conflict information is incorporated through a set of daily conflict indices constructed from the UCDP Georeferenced Event Dataset (GED). At the event level, conflict intensity is proxied by the variable best, which represents the best estimate of total fatalities associated with each event.
+Armed-conflict information is incorporated through a set of daily conflict indices constructed from the UCDP GED.
 
-Conflict events are aggregated at the daily frequency to ensure consistency with the financial data. To reduce skewness and mitigate the influence of extreme observations, daily fatalities are transformed using a logarithmic transformation defined as log(1 + fatalities). These series are then smoothed using exponentially weighted moving averages (EWMA) with decay parameters λ = 0.94 and λ = 0.97, capturing persistence in geopolitical risk while assigning greater weight to recent events.
+At the event level, conflict intensity is proxied by the number of fatalities (best). Events are aggregated at the daily frequency to align with financial data. To mitigate skewness and extreme observations, daily fatalities are transformed as:
 
-To ensure economic relevance, conflict indices are constructed at different levels of aggregation. These include region-specific indices (e.g. Middle East) as well as commodity-specific indices based on groups of key producing countries (e.g. oil focus and gas focus). All conflict variables are strictly lagged (t−1, t−5) before entering the models, ensuring that only information available prior to the forecast date is used and preventing any form of information leakage.
+log(1+fatalities)
+
+These daily series are smoothed using exponentially weighted moving averages (EWMA) with decay parameters 𝜆=0.94 and 𝜆=0.97, capturing persistence in geopolitical risk while emphasizing recent events.
+
+Conflict indices are constructed at different aggregation levels:
+
+- Region-specific indices (e.g. Middle East, Europe) based on key producing regions (e.g. oil focus, gas focus)
+
+All conflict variables enter the models with strict lags (e.g. 𝑡−1, 𝑡−5) to prevent information leakage.
 
 ## Project Structure
 
@@ -82,16 +118,3 @@ commodity-volatility-conflict/
 │   └── models/                  # (Upcoming) HAR, GARCH, and ML model definitions
 │
 └── results/               # (Upcoming) Figures and forecast evaluation tables
-
-### Reproducibility
-
-1. **Clean commodity prices**  
-   `src/data_loader.py` → `data/processed/commodities/*_clean.csv`
-2. **Reduce and sort UCDP GED** (event-level)  
-   `src/conflict_loader.py` → `data/processed/conflicts/ucdp_ged_reduced_sorted.csv`
-3. **Build daily conflict indices** (EWMA, regions, focus countries)  
-   `src/conflict_index_builder.py` → `data/processed/indices/*.csv`
-4. **Build final model datasets** (merge + RV target + lags)  
-   `src/build_model_dataset.py` → `data/processed/model_datasets/*_dataset.csv`
-5. **Model estimation and evaluation**  
-   HAR / GARCH / ML with walk-forward evaluation

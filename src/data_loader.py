@@ -1,16 +1,19 @@
-# src/data_loader.py
-# Build clean commodity price series from Investing.com "raw" CSV parts.
+"""
+Data cleaning pipeline for Investing.com raw CSV files.
+
+Assumption:
+- All input files originate from the US version of Investing.com.
+- Dates strictly follow the US format: MM/DD/YYYY.
+
+Any deviation from this format will result in missing values (NaT),
+by design, to avoid silent misparsing.
+"""
+
 # Raw parts are expected to be the untouched Investing.com downloads:
 # - usually a single column per row containing comma-separated fields
-# - mixed date formats (MM.DD.YYYY and/or MM/DD/YYYY)
 # - numeric fields with commas, %, K/M suffixes in Volume, etc.
-#
 # Output: one clean CSV per commodity with columns:
 # Date, Price, Open, High, Low, Vol., Change %
-#
-# src/data_loader.py
-# Build clean commodity price series from Investing.com "raw" CSV parts.
-# Robust version: Handles ambiguous dates (US default) and numeric cleaning.
 
 from __future__ import annotations
 
@@ -21,15 +24,12 @@ import warnings
 import numpy as np
 import pandas as pd
 
-# -----------------------------
 # 1. Numeric & Date Cleaning
-# -----------------------------
-
 def _convert_numeric(value: object) -> float:
-    """
-    Robust numeric conversion (US format with ',' for thousands).
-    Handles %, K, M suffixes and rounds volumes to avoid floating point errors.
-    """
+    
+    # Robust numeric conversion (US format with ',' for thousands).
+    # Handles %, K, M suffixes and rounds volumes to avoid floating point errors.
+    
     if not isinstance(value, str) or not value:
         if isinstance(value, (int, float)):
             return float(value)
@@ -55,51 +55,18 @@ def _convert_numeric(value: object) -> float:
         return np.nan
 
 def _standardize_date(date_str: object) -> pd.Timestamp:
-    """
-    Parses a date string with smart handling of US/EU ambiguity.
-    
-    Logic:
-    1. Clean string (replace '.' with '/').
-    2. If 1st part > 12 (e.g., 13/01) -> Must be Day -> EU Format (DD/MM/YYYY).
-    3. If 2nd part > 12 (e.g., 01/25) -> Must be Day -> US Format (MM/DD/YYYY).
-    4. If ambiguous (e.g., 01/02) -> Default to US (MM/DD/YYYY) as per Investing.com standard.
-    """
+
+    # Parses a date string assuming strictly US format (MM/DD/YYYY).
     if not isinstance(date_str, str) or not date_str:
         return pd.NaT
 
-    # 1. Preliminary cleaning
-    s = date_str.strip('"\' ').replace(".", "/")
-    
-    try:
-        parts = s.split('/')
-        if len(parts) != 3:
-            # Try default parsing if structure is unexpected
-            return pd.to_datetime(s, errors='coerce')
-        
-        p0, p1 = int(parts[0]), int(parts[1])
+    s = date_str.strip('"\' ')
+    return pd.to_datetime(s, format="%m/%d/%Y", errors="coerce")
 
-        # 2. Logic detection
-        if p0 > 12:
-            # First part > 12 implies it is a Day. Format is EU.
-            return pd.to_datetime(s, format="%d/%m/%Y")
-        
-        elif p1 > 12:
-            # Second part > 12 implies it is a Day. Format is US.
-            return pd.to_datetime(s, format="%m/%d/%Y")
-        
-        else:
-            # Ambiguous (e.g., 01/02). Default to US format.
-            return pd.to_datetime(s, format="%m/%d/%Y")
-            
-    except (ValueError, TypeError):
-        return pd.NaT
 
-# -----------------------------
 # 2. Raw CSV Parsing
-# -----------------------------
-
 def _find_header_row_idx(raw_df: pd.DataFrame) -> Optional[int]:
-    """Find row index containing the header (looking for 'Date')."""
+    #Find row index containing the header (looking for 'Date')
     for idx, row in raw_df.iterrows():
         v = row.iloc[0]
         if isinstance(v, str) and "Date" in v:
@@ -110,7 +77,7 @@ def _parse_header(header_row: str) -> List[str]:
     return [col.strip('"\' ') for col in header_row.split(",")]
 
 def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
-    """Split a raw CSV line handling quotes properly."""
+    #Split a raw CSV line handling quotes properly.
     if not isinstance(row_str, str):
         return [None] * n_cols
 
@@ -119,7 +86,7 @@ def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
     in_quotes = False
 
     for char in row_str:
-        if char in ['"', "'"]:
+        if char == '"':
             in_quotes = not in_quotes
         elif char == "," and not in_quotes:
             values.append(current.strip('"\' '))
@@ -135,10 +102,10 @@ def _split_row(row_str: str, n_cols: int) -> List[Optional[str]]:
     return values[:n_cols]
 
 def read_investing_raw_csv(path: Path) -> pd.DataFrame:
-    """
-    Reads a raw Investing.com CSV file.
-    Prints a warning if the file is unusable.
-    """
+    
+    # Reads a raw Investing.com CSV file.
+    # Prints a warning if the file is unusable.
+    
     # Force read as string to handle bad formatting
     try:
         raw_df = pd.read_csv(path, header=None, low_memory=False, dtype=str)
@@ -210,14 +177,11 @@ def read_investing_raw_csv(path: Path) -> pd.DataFrame:
     
     return df.loc[:, keep]
 
-# -----------------------------
-# 3. Main Pipeline
-# -----------------------------
 
+# 3. Main Pipeline
 def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path) -> pd.DataFrame:
-    """
-    Merges all CSV parts from a folder into a single clean file.
-    """
+    
+    # Merges all CSV parts from a folder into a single clean file.
     parts_dir = Path(parts_dir)
     out_file = Path(out_file)
     out_file.parent.mkdir(parents=True, exist_ok=True)

@@ -2,108 +2,135 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-def load_commodity_clean(path: Path) -> pd.DataFrame:
+# Load already-prepared commodity features (HAR + Garman-Klass)
+def load_features_ready(path: Path) -> pd.DataFrame:
+    # Load the commodity FEATURES file.
+    # Expected columns:
+    # - Date, Price, RV_Daily, RV_Weekly, RV_Monthly
+    
     if not path.exists():
-        raise FileNotFoundError(f"Commodity file not found: {path}")
+        raise FileNotFoundError(f"Feature file not found: {path}")
+
     df = pd.read_csv(path)
-    # Robust date parsing (Dayfirst=True)
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
-    # [ADJUSTMENT 2] Normalize date to remove time component (00:00:00) for clean merges
+
+    # Date parsing (ISO format assumed)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"]).sort_values("Date")
+
+    # Normalize to midnight for safe merges
     df["Date"] = df["Date"].dt.normalize()
-    
-    df = df.dropna(subset=["Date"]).sort_values("Date").drop_duplicates("Date")
-    df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-    return df.dropna(subset=["Price"])[["Date", "Price"]].reset_index(drop=True)
 
-def add_returns_and_rv(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    # Log returns
-    df["r"] = np.log(df["Price"] / df["Price"].shift(1))
-    
-    # [ADJUSTMENT 1] Handle infinite values if Price was 0 (rare but possible)
-    df = df.replace([np.inf, -np.inf], np.nan)
-    
-    df["r2"] = df["r"] ** 2
-    
-    # HAR inputs (Past volatility)
-    df["RV_1"]  = df["r2"]
-    df["RV_5"]  = df["r2"].rolling(5).sum()
-    df["RV_21"] = df["r2"].rolling(21).sum()
-    
-    # Target: Future volatility (21 days)
-    # First Rolling Forward, then Shift
-    # This captures the sum of r^2 from t+1 to t+21
-    indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=21)
-    df["RV_fut_21"] = df["r2"].rolling(window=indexer).sum().shift(-1)
-    
-    return df
+    # Mandatory column check
+    required_cols = {"Date", "Price", "RV_Daily", "RV_Weekly", "RV_Monthly"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise KeyError(f"Missing required feature columns: {missing}")
 
+    return df.reset_index(drop=True)
+
+# Load conflict indices
 def load_conflict_index(path: Path, cols_keep: list[str]) -> pd.DataFrame:
+    # Load a conflict index file and keep only selected columns.
+    
     if not path.exists():
         raise FileNotFoundError(f"Conflict file not found: {path}")
-    c = pd.read_csv(path)
-    # Robust date parsing
-    c["Date"] = pd.to_datetime(c["Date"], errors="coerce", dayfirst=True)
-    # [ADJUSTMENT 2] Normalize date to ensure match with commodity dates
-    c["Date"] = c["Date"].dt.normalize()
-    
-    c = c.dropna(subset=["Date"]).sort_values("Date").drop_duplicates("Date")
-    # Keep only requested columns + Date
-    return c[["Date"] + [col for col in cols_keep if col in c.columns]].reset_index(drop=True)
 
+    c = pd.read_csv(path)
+
+    c["Date"] = pd.to_datetime(c["Date"], errors="coerce")
+    c["Date"] = c["Date"].dt.normalize()
+
+    c = (
+        c.dropna(subset=["Date"])
+         .sort_values("Date")
+         .drop_duplicates("Date")
+    )
+
+    actual_cols = [col for col in cols_keep if col in c.columns]
+    if len(actual_cols) < len(cols_keep):
+        missing = set(cols_keep) - set(actual_cols)
+        print(f"Attention: Missing conflict columns: {missing}")
+
+    return c[["Date"] + actual_cols].reset_index(drop=True)
+
+# Build final HAR + Conflict modeling dataset
 def build_dataset_for_commodity(
     commodity_name: str,
-    commodity_csv: Path,
+    commodity_features_csv: Path,
     conflict_files: dict[str, Path],
     conflict_cols: list[str],
-    conflict_lags=(1, 5),
+    conflict_lags: list[int] = [0, 1],  # lag0 = today, lag1 = yesterday
     out_path: Path | None = None,
 ) -> pd.DataFrame:
-    
-    print(f"   [Merge] Processing {commodity_name}...")
-    df = load_commodity_clean(commodity_csv)
-    df = add_returns_and_rv(df)
 
-    # 1. Merge conflict files (Left Join)
+    print(f"Building dataset for {commodity_name}...")
+
+    # 1) Load financial features (already computed!)
+    df = load_features_ready(commodity_features_csv)
+
+    # 2) Define TARGET: next-day volatility (HAR standard)
+    # Target_t = RV_Daily_{t+1}
+    df["Target_RV"] = df["RV_Daily"].shift(-1)
+
+    # 3) Merge conflict indices
     for tag, fpath in conflict_files.items():
-        if fpath is None or not fpath.exists(): continue
+        if fpath is None or not fpath.exists():
+            continue
+
         c = load_conflict_index(fpath, conflict_cols)
-        # Rename to avoid collisions (e.g., oil_focus__log_fatal...)
-        c = c.rename(columns={col: f"{tag}__{col}" for col in conflict_cols})
+
+        # Rename to avoid collisions (e.g. oil_focus__log_fatal_ewma_94)
+        rename_map = {col: f"{tag}__{col}" for col in conflict_cols}
+        c = c.rename(columns=rename_map)
+
+        # Left join: keep all trading days
         df = df.merge(c, on="Date", how="left")
 
-    # 2. Fill conflict NaNs with 0 BEFORE creating lags
-    # Identify conflict columns using "__" separator
-    # If left join gives NaN, it means no conflict that day -> 0
-    merged_conf_cols = [c for c in df.columns if "__" in c]
-    if merged_conf_cols:
-        df[merged_conf_cols] = df[merged_conf_cols].fillna(0.0)
+        # No conflict that day = 0
+        new_cols = list(rename_map.values())
+        df[new_cols] = df[new_cols].fillna(0.0)
 
-    # 3. Create Lags (Anti-Leakage)
-    for col in merged_conf_cols:
-        for L in conflict_lags:
-            df[f"{col}_lag{L}"] = df[col].shift(L)
+        # Create lags (anti-leakage)
+        for col in new_cols:
+            for L in conflict_lags:
+                df[f"{col}_lag{L}"] = df[col].shift(L)
 
-    # 4. Final column selection
-    # r2 included for GARCH/Diagnostics
-    keep = ["Date", "Price", "r", "r2", "RV_1", "RV_5", "RV_21", "RV_fut_21"]
-    keep += [f"{col}_lag{L}" for col in merged_conf_cols for L in conflict_lags]
-    
-    # 5. Final cleanup (remove gaps created by lags/rolling/inf)
-    # Now, dropna only removes series start/end (rolling),
-    # not the peaceful days.
-    out = df[[k for k in keep if k in df.columns]].dropna().reset_index(drop=True)
-    
-    # [MANDATORY CHECK] Data validation
-    if not out.empty:
-        print(f"   Date range: {out['Date'].min().date()} -> {out['Date'].max().date()}")
-        print(f"   Columns: {len(out.columns)}")
+        # Drop raw (non-lagged) conflict columns
+        df = df.drop(columns=new_cols)
+
+    # 4) Final column selection
+    base_cols = [
+        "Date",
+        "Price",
+        "Target_RV",
+        "RV_Daily",
+        "RV_Weekly",
+        "RV_Monthly",
+    ]
+
+    conflict_features = [c for c in df.columns if "__" in c and "lag" in c]
+    final_cols = base_cols + conflict_features
+
+    # 5) Final cleanup
+    out = (
+        df[final_cols]
+        .replace([np.inf, -np.inf], np.nan)
+        .dropna()
+        .reset_index(drop=True)
+    )
+
+    # Validation
+    if out.empty:
+        print("ERROR: Dataset empty after cleaning!")
     else:
-        print("   [WARN] Dataset is empty after dropna!")
+        print(f"Date range: {out['Date'].min().date()} → {out['Date'].max().date()}")
+        print(f"Rows: {len(out)} | Columns: {len(out.columns)}")
+        print(f"Conflict features: {conflict_features}")
 
+    # Save
     if out_path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(out_path, index=False)
-        print(f"   [Saved] {out_path.name} ({len(out)} rows)")
+        print(f"Saved {out_path.name}")
 
     return out
