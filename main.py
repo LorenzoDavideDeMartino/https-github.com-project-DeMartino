@@ -18,10 +18,9 @@ from src.evaluation import run_walk_forward
 
 def main() -> None:
     # Step 1. Repository root
-    print("----------STEP 1----------")
     repo = Path(__file__).resolve().parent
 
-    # DEFINITION DES CHEMINS (PATHS)
+    # Definition of paths
     raw_commodities = repo / "data" / "raw" / "commodities"
     
     # Outputs Commodities
@@ -47,7 +46,10 @@ def main() -> None:
         parts_dir = raw_commodities / folder / "parts"
         clean_file = out_clean / clean_name
         feat_file = out_feat / feat_name
+        # (IA Suggestion) The definition of file paths follows a standard Python project structure suggested by AI,
+        # as this was not known prior to this project.
 
+        # Check or creation of clean commodity csv
         df_clean = None
         if clean_file.exists():
             print(f"Existing Clean file already exists ({clean_name}).")
@@ -63,8 +65,8 @@ def main() -> None:
         if feat_file.exists():
             print(f"Existing Feature file already exists ({feat_name})")
         else:
-            if df_clean is not None and not df_clean.empty:
-                print(f"Creating Features...")
+            if df_clean is not None and len(df_clean) > 0:
+                print(f"Creating Commodities Features...")
                 df_feat = build_features_df(
                     df_clean,
                     price_col="Price",
@@ -73,9 +75,9 @@ def main() -> None:
                 df_feat.to_csv(feat_file, index=False)
                 print(f"Saved: {feat_file}")
             else:
-                print("ERROR: Cannot calculate features (missing clean data).")
+                print("Attention: Cannot calculate features.")
 
-    # Step 3. CONFLICTS PIPELINE (UCDP GED)
+    # Step 3. CONFLICTS PIPELINE
     print("----------STEP 3----------")
     ucdp_raw = repo / "data" / "raw" / "conflicts" / "GEDEvent_v25_1.csv"
     ucdp_reduced = repo / "data" / "processed" / "conflicts" / "ucdp_ged_reduced_sorted.csv"
@@ -88,7 +90,7 @@ def main() -> None:
     elif ucdp_raw.exists():
         build_ucdp_reduced_sorted(ucdp_raw, ucdp_reduced)
     else:
-        print("Fichier raw UCDP absent.")
+        print("Fichier raw UCDP missing. You need to download it if you have delete the cleaned one, it was to heavy for github")
 
     # Step 3.1 : Index Construction (Oil Focus, Gas Focus, etc.)
     required_files = [
@@ -99,7 +101,7 @@ def main() -> None:
     ]
 
     if all(p.exists() for p in required_files):
-        print(f"Indices exist in {out_indices.name}.")
+        print(f"Existing Indices in {out_indices.name}.")
     else:
         if ucdp_reduced.exists():
             print("Building conflict panels...")
@@ -108,12 +110,11 @@ def main() -> None:
                     input_file=ucdp_reduced,
                     out_dir=out_indices,
                     start_date="1990-01-01",
-                    end_date="2024-12-31"
-                )
+                    end_date="2024-12-31")
             except Exception as e:
-                print(f"ERROR: Index Builder Failed: {e}")
+                print(f"Attention: Index Builder Failed: {e}") # <- IA Suggestion : Catch unexpected failures during index construction.
         else:
-            print("ERROR: Cannot build indices, reduced file missing.")
+            print("Attention: Cannot build indices, reduced file missing.") # Cannot build indices without the reduced UCDP dataset.
 
     # STEP 4: FINAL MERGE (Datasets pour Models)
     print("----------STEP 4----------")
