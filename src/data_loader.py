@@ -160,7 +160,7 @@ def read_investing_raw_csv(path: Path):
         )
         return pd.DataFrame()
 
-    # Convert dates using the strict US format.
+    # Convert dates using the strict US format. Otherwise we could have maybe some bugs. 
     df["Date"] = df["Date"].apply(_standardize_date)
 
     # Convert numeric columns explicitly.
@@ -196,7 +196,7 @@ def build_clean_commodity_from_parts(parts_dir: Path, out_file: Path):
     out_file = Path(out_file)
     out_file.parent.mkdir(parents=True, exist_ok=True) # (<- IA Input: Prevents save errors if the output directory does not exist.)
 
-    # The pipeline cannot run without input files, so we fail early and explicitly.
+    # The pipeline cannot run without input files, so we would fail early.
     files = sorted(parts_dir.glob("*.csv"))
     if not files:
         raise FileNotFoundError(f"No CSV parts found in: {parts_dir}")

@@ -33,11 +33,11 @@ def build_features_df(df: pd.DataFrame, price_col: str = "Price", date_col: str 
     out["RV_Weekly"] = out["RV_Daily"].rolling(5).mean()
     out["RV_Monthly"] = out["RV_Daily"].rolling(22).mean()
 
-    # Rows with missing long-horizon volatility are removed to ensure that the target variable is well defined
+    # Rows with missing long-horizon volatility are removed to ensure that the target variable is well defined. 
     out = out.dropna(subset=["RV_Monthly"])
 
     # Intermediate or unused columns are removed to keep the dataset focused on variables that are actually used in the models
-    cols_to_drop = ["High", "Low", "Squared_Ret"]
+    cols_to_drop = ["High", "Low"]
     out = out.drop(columns=cols_to_drop, errors="ignore")
 
     return out

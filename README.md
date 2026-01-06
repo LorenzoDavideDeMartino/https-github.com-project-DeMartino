@@ -110,41 +110,6 @@ commodity-volatility-conflict/
 └── results/               # (Upcoming) Figures and forecast evaluation tables
 ```
 
-## Notebooks (planned)
-
-The project is designed around a fully reproducible Python pipeline executed via `main.py`.  
-At the current stage, the analysis does not rely on Jupyter notebooks.
-
-A notebook-based workflow is planned for future extensions of the project, primarily for exploratory analysis, visualization, and robustness checks. The intended notebook structure is outlined below for completeness but has not yet been implemented.
-
-Planned notebooks include:
-
-- `01_data_download.ipynb`  
-  Intended to download daily price data and align all assets on common dates.
-
-- `02_log_returns.ipynb`  
-  Intended to compute daily log-returns from price data and handle non-positive prices.
-
-- `03_feature_engineering.ipynb`  
-  Intended to construct lagged returns and rolling statistics and define prediction targets.
-
-- `04_modeling.ipynb`  
-  Intended to implement baseline and predictive models using chronological train/test splits.
-
-- `05_modeling_final.ipynb`  
-  Intended to evaluate model performance and produce diagnostic plots.
-
-- `06_time_series_validation.ipynb`  
-  Intended to perform walk-forward validation to assess model stability.
-
-- `07_oil_shock_analysis.ipynb`  
-  Intended to analyze extreme oil price movements and asset reactions.
-
-- `08_final_economic_analysis.ipynb`  
-  Intended to synthesize results and provide economic interpretation.
-
-These notebooks are marked as *incoming* and are not required to run the current version of the project.
-
 ## How to run the project
 
 The entire project is executed through the main pipeline script.
