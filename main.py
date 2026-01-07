@@ -1,22 +1,22 @@
 import pandas as pd
 from pathlib import Path
 
-    # For "Step B: COMMODITIES PIPELINE"
+    # For "Step B: Commodities data loading"
 from src.data_loader import build_clean_commodity_from_parts
-    # For "Step B.1: COMMODITIES PIPELINE"
+    # For "Step B.1: Commodities features"
 from src.commodities_features import build_features_df
-   #  For "Step C. CONFLICTS PIPELINE"
+   #  For "Step C: Conflicts data loading"
 from src.conflict_loader import build_ucdp_reduced_sorted
-    # For "Step C.1 : Index Construction"
+    # For "Step C.1: Index Construction"
 from src.conflict_index_builder import build_daily_panels, prepare_region_view
     # For "Step 4: Final Merge"
 from src.build_model_dataset import build_dataset_for_commodity
-    # For "Step 5: ANALYSIS" 
+    # For "Step 5: Analysis" 
 from src.models import run_har_comparison
-
+    # For "Step 6: Evaluation"
 from src.evaluation import run_walk_forward
 
-def main() -> None:
+def main():
     # Step 1. Repository root
     repo = Path(__file__).resolve().parent
 
@@ -58,8 +58,7 @@ def main() -> None:
             print(f"Creating Clean file...")
             df_clean = build_clean_commodity_from_parts(
                 parts_dir=parts_dir,
-                out_file=clean_file,
-            )
+                out_file=clean_file)
 
         # 2.1: Features (From the clean csv to the features)
         if feat_file.exists():
@@ -166,25 +165,22 @@ def main() -> None:
             print(f"Skip {name} (files missing)")
 
     # STEP 5: ANALYSIS (DIAGNOSTIC)
-        print("----------STEP 5----------")
-        for name, fpath in final_files:
-                if fpath.exists():
-                    run_har_comparison(fpath, name)
+    print("----------STEP 5----------")
+    for name, fpath in final_files:
+            if fpath.exists():
+                run_har_comparison(fpath, name)
 
 
-    # STEP 6: OUT-OF-SAMPLE FORECAST EVALUATION (WALK-FORWARD)
+    # STEP 6
     print("----------STEP 6----------")
-    # CONFIGURATION
-    # Window size: 1000 days (approx 4 years of history for training)
-    WINDOW_SIZE = 1000
     
-    # OPTIMIZATION: Update model every 5 trading days 
-    # This drastically reduces computation time without compromising statistical validity.
-    STEP_SIZE_OPTIMIZED = 5 
+    WINDOW_SIZE = 750  # ~3 years; enough history and faster
+    
+    # Update model every 5 trading days 
+    STEP_SIZE_OPTIMIZED = 5 # This drastically reduces computation time without compromising statistical validity.
     
     # Newey-West Lags for Diebold-Mariano test
-    # Set to 5 for robustness against serial correlation in weekly steps.
-    NW_LAGS = 5
+    NW_LAGS = 5 # Set to 5 for robustness against serial correlation in weekly steps.
 
     # Iterate over the datasets created in Step 4
     for name, path in final_files:

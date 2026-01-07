@@ -13,7 +13,6 @@ GAS_FOCUS_COUNTRIES = {
     "United States of America", "Russia", "Iran", "China", "Canada", "Qatar",
     "Australia", "Saudi Arabia", "Norway", "Algeria"}
 
-
 def ewma(series: pd.Series, lam: float):
     # EWMA smooths conflict intensity while emphasizing recent events.
     return series.ewm(alpha=(1 - lam), adjust=False).mean() # Exponentially weighted moving average of conflict intensity.
@@ -60,10 +59,10 @@ def build_daily_panels(
         daily.to_csv(out_path)
         return daily
 
-    # A) GLOBAL PANEL (H1)
+    # A) Global panel (H1) 
     g = process_panel(df, "global")
 
-    # B) KEY REGIONS PANEL (H2)
+    # B) Key regions panel (H2)
     # Keep only continuous intensity measures (log and EWMA) for each region
     if "Region" in df.columns:
         df_reg = df.copy()
@@ -93,8 +92,8 @@ def build_daily_panels(
 
         out_reg.to_csv(out_dir / "conflict_daily_by_region.csv")
 
-    # C) FOCUS INDICES (H2)
-    # Focus panels restrict conflicts to key producer countries to proxy commodity-specific exposure (H2).
+    # C) Focus indices (H2)
+    # Focus panels restrict conflicts to key producer countries to proxy commodity-specific exposure (H2)
     g_oil = pd.DataFrame()
     g_gas = pd.DataFrame()
 

@@ -1,16 +1,17 @@
 """
 Data cleaning pipeline for Investing.com raw CSV files.
 
-Raw CSV files downloaded from Investing.com are not standard CSV files.
-They often contain a single column with comma-separated values, mixed numeric
-formats, and inconsistent headers. Centralizing all cleaning logic here
-improves reproducibility and avoids fragile fixes later in the project.
+Because of the time scale chosen for this study, it is necessary to have a cleaning and merging code, as 
+it is not possible to download all the data at once from Investing.com. And for reasons of reproducibility 
+I didn't want to ask you to merge the documents manually with the risk of errors.
 
-Assumptions:
-- Files come from the [IMPORTANT] US VERSION of Investing.com.
-- Dates follow the US format: MM/DD/YYYY.
-- Any deviation from this format is converted to missing values on purpose
-  to avoid silent parsing errors.
+Raw CSV files downloaded from Investing.com are often contain a single column with comma-separated values, 
+mixed numeric formats, and inconsistent headers. 
+Centralizing all cleaning logic here improves reproducibility and avoids fragile fixes later in the project.
+
+IMPORTANT: If you want to download the data yourself, you need to:
+- Files come from the US VERSION of Investing.com.
+-   => Dates follow the US format: MM/DD/YYYY.
 """
 from __future__ import annotations
 
