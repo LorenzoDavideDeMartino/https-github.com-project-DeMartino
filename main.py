@@ -8,12 +8,11 @@ from src.commodities_features import build_features_df
    #  For "Step C: Conflicts data loading"
 from src.conflict_loader import build_ucdp_reduced_sorted
     # For "Step C.1: Index Construction"
-from src.conflict_index_builder import build_daily_panels, prepare_region_view
+from src.conflict_index_builder import build_daily_panels
     # For "Step 4: Final Merge"
 from src.build_model_dataset import build_dataset_for_commodity
-    # For "Step 5: Analysis" 
+    # For "Step 5: Analysis" + "Step 6: Evaluation"
 from src.models import run_har_comparison
-    # For "Step 6: Evaluation"
 from src.evaluation import run_walk_forward
 
 def main():
@@ -23,8 +22,10 @@ def main():
     # Definition of paths
     raw_commodities = repo / "data" / "raw" / "commodities"
     
-    # Outputs Commodities
+    # Outputs processed commodities
     out_clean = repo / "data" / "processed" / "commodities"
+    
+    # Outputs features 
     out_feat = repo / "data" / "processed" / "features"
     
     # Outputs Conflicts
@@ -36,12 +37,12 @@ def main():
     out_indices.mkdir(parents=True, exist_ok=True)
 
     # Step 2.COMMODITIES PIPELINE
-    print("----------STEP 2----------")
+    print("----------Step 2----------")
     targets = [
         ("gold", "gold_clean.csv", "gold_features.csv"),
         ("crude_oil_wti", "crude_oil_wti_clean.csv", "crude_oil_wti_features.csv"),
-        ("natural_gas", "natural_gas_clean.csv", "natural_gas_features.csv"),
-    ]
+        ("natural_gas", "natural_gas_clean.csv", "natural_gas_features.csv")]
+    
     for folder, clean_name, feat_name in targets:
         parts_dir = raw_commodities / folder / "parts"
         clean_file = out_clean / clean_name
@@ -63,7 +64,9 @@ def main():
         # 2.1: Features (From the clean csv to the features)
         if feat_file.exists():
             print(f"Existing Feature file already exists ({feat_name})")
+
         else:
+
             if df_clean is not None and len(df_clean) > 0:
                 print(f"Creating Commodities Features...")
                 df_feat = build_features_df(
@@ -77,12 +80,13 @@ def main():
                 print("Attention: Cannot calculate features.")
 
     # Step 3. CONFLICTS PIPELINE
-    print("----------STEP 3----------")
+    print("----------Step 3----------")
     ucdp_raw = repo / "data" / "raw" / "conflicts" / "GEDEvent_v25_1.csv"
     ucdp_reduced = repo / "data" / "processed" / "conflicts" / "ucdp_ged_reduced_sorted.csv"
     
     # Check if the file exist
     ucdp_reduced.parent.mkdir(parents=True, exist_ok=True)
+
     # Execution reduction function
     if ucdp_reduced.exists():
         print(f"Existing conflict file already exists : {ucdp_reduced.name}")
@@ -91,19 +95,19 @@ def main():
     else:
         print("Fichier raw UCDP missing. You need to download it if you have delete the cleaned one, it was to heavy for github")
 
-    # Step 3.1 : Index Construction (Oil Focus, Gas Focus, etc.)
+    # Step 3.1 : Index Construction
     required_files = [
         out_indices / "conflict_daily_global.csv",
-        out_indices / "conflict_daily_by_region.csv",
-        out_indices / "conflict_daily_oil_focus.csv",
-        out_indices / "conflict_daily_gas_focus.csv",
-    ]
+        out_indices / "conflict_daily_by_region.csv"]
 
     if all(p.exists() for p in required_files):
         print(f"Existing Indices in {out_indices.name}.")
+
     else:
+
         if ucdp_reduced.exists():
             print("Building conflict panels...")
+
             try:
                 build_daily_panels(
                     input_file=ucdp_reduced,
@@ -116,47 +120,43 @@ def main():
             print("Attention: Cannot build indices, reduced file missing.") # Cannot build indices without the reduced UCDP dataset.
 
     # STEP 4: FINAL MERGE (Datasets pour Models)
-    print("----------STEP 4----------")
+    print("----------Step 4----------")
     out_models = repo / "data" / "processed" / "model_datasets"
     out_models.mkdir(parents=True, exist_ok=True)
 
-    # 2. Create regional views (Middle East, Europe)
-    region_source = out_indices / "conflict_daily_by_region.csv"
-    me_view = prepare_region_view(region_source, "Middle East", out_indices / "view_middle_east.csv")
-    eu_view = prepare_region_view(region_source, "Europe", out_indices / "view_europe.csv")
-
-    # 3. Commodity
+    # 1) Commodity
     comm_map = {
         "WTI":  out_feat / "crude_oil_wti_features.csv",
         "GAS":  out_feat / "natural_gas_features.csv",
-        "GOLD": out_feat / "gold_features.csv"
-    }
+        "GOLD": out_feat / "gold_features.csv"}
 
+    # 2) Conflict files (match conflict_index_builder outputs)
     merge_config = {
-        "WTI":  {"oil_focus": out_indices / "conflict_daily_oil_focus.csv", "middle_east": me_view},
-        "GAS":  {"gas_focus": out_indices / "conflict_daily_gas_focus.csv", "europe": eu_view},
-        "GOLD": {"middle_east": me_view, "global": out_indices / "conflict_daily_global.csv"}
-    }
+        "WTI":  {"middle_east": out_indices / "conflict_daily_by_region.csv"},
+        "GAS":  {"europe": out_indices / "conflict_daily_by_region.csv"},
+        "GOLD": {"global": out_indices / "conflict_daily_global.csv",
+                "middle_east": out_indices / "conflict_daily_by_region.csv"}}
+
     final_files = []
 
-    # 4. Execution of the function for merge 
+    # 3) Execution of the function for merge 
     for name, conflict_map in merge_config.items():
-        # Only existing conflict files are kept
         valid_map = {k: v for k, v in conflict_map.items() if v is not None and v.exists()}
         comm_file = comm_map.get(name)
-        
+
         if comm_file and comm_file.exists() and valid_map:
+
             try:
                 out_p = out_models / f"{name.lower()}_dataset.csv"
-                
+
                 build_dataset_for_commodity(
                     commodity_name=name,
                     commodity_features_csv=comm_file,
                     conflict_files=valid_map,
-                    conflict_cols=["log_fatal_ewma_94"],
-                    conflict_lags=(0, 1),
-                    out_path=out_models / f"{name.lower()}_dataset.csv"
-                )
+                    conflict_cols=["log_deaths_ewma_94"],
+                    conflict_lags=[0, 1],
+                    out_path=out_p)
+                
                 final_files.append((name, out_p))
 
             except Exception as e:
@@ -165,14 +165,14 @@ def main():
             print(f"Skip {name} (files missing)")
 
     # STEP 5: ANALYSIS (DIAGNOSTIC)
-    print("----------STEP 5----------")
+    print("----------Step 5----------")
+    print("----In-Sample results-----")
     for name, fpath in final_files:
             if fpath.exists():
                 run_har_comparison(fpath, name)
-
-
+    
     # STEP 6
-    print("----------STEP 6----------")
+    print("----------Step 6----------")
     
     WINDOW_SIZE = 750  # ~3 years; enough history and faster
     
@@ -191,8 +191,8 @@ def main():
                     commodity_name=name, 
                     window_size=WINDOW_SIZE, 
                     step_size=STEP_SIZE_OPTIMIZED, 
-                    nw_lags_dm=NW_LAGS
-                )
+                    nw_lags_dm=NW_LAGS)
+                
             except Exception as e:
                 print(f"[Error] Evaluation failed for {name}: {e}")
 

@@ -81,17 +81,20 @@ def build_dataset_for_commodity(
         if fpath is None or not fpath.exists():
             continue
 
-        c = load_conflict_index(fpath, conflict_cols)
+        cols_to_load = []
+        for col in conflict_cols:
+            if "__" in col:
+                cols_to_load.append(col)
+            else:
+                cols_to_load.append(f"{tag}__{col}")
 
-        # Prefixing makes each source explicit (oil_focus vs middle_east) and prevents name collisions
-        rename_map = {col: f"{tag}__{col}" for col in conflict_cols}
-        c = c.rename(columns=rename_map)
+        c = load_conflict_index(fpath, cols_to_load)
 
         # A left join keeps the full commodity time series and simply adds conflict information when available
         df = df.merge(c, on="Date", how="left")
 
         # Missing conflict entries are treated as zero intensity rather than dropping trading days
-        new_cols = list(rename_map.values())
+        new_cols = [c for c in cols_to_load if c in df.columns]
         df[new_cols] = df[new_cols].fillna(0.0)
 
         # Lags ensure regressors only use information that would have been known at prediction time

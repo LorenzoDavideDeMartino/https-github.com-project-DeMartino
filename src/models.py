@@ -12,7 +12,7 @@ def _fit_ols_hac(y: pd.Series, X: pd.DataFrame, maxlags: int = 21):
     # HAR models are linear regressions, so OLS is an appropriate estimator.
     # HAC standard errors are used to handle volatility persistence and changing variance in financial time series
     Xc = sm.add_constant(X, has_constant="add")
-    return sm.OLS(y, Xc).fit(cov_type="HAC", cov_kwds={"maxlags": maxlags})
+    return sm.OLS(y, Xc).fit(cov_type="HAC", cov_kwds={"maxlags": maxlags}) # <-IA help to implement
 
 def run_har_comparison(file_path: Path, commodity_name: str):
     # This function performs an in-sample diagnostic comparison between a baseline HAR model and several HAR-X variants
@@ -38,10 +38,9 @@ def run_har_comparison(file_path: Path, commodity_name: str):
     # (IA suggestion) This avoids hard-coding column names and keeps the logic flexible
     candidates = [
         c for c in df.columns
-        if ("log_fatal" in c.lower())
+        if ("log_deaths" in c.lower())
         and (EWMA_KEEP in c.lower())
-        and (c.endswith("_lag0") or c.endswith("_lag1"))
-    ]
+        and (c.endswith("_lag0") or c.endswith("_lag1"))]
 
     if not candidates:
         # If no conflict variables are present, we only estimate the baseline HAR
@@ -55,10 +54,10 @@ def run_har_comparison(file_path: Path, commodity_name: str):
     name = commodity_name.lower()
 
     # Conflict variables are grouped into economically meaningful blocks depending on the commodity under study
-    if "wti" in name or "oil" in name:
-        families = ["oil_focus", "middle_east"]
+    if "wti" in name:
+        families = ["middle_east"]
     elif "gas" in name:
-        families = ["gas_focus", "europe"]
+        families = ["europe"]
     elif "gold" in name:
         families = ["global", "middle_east"]
     else:
@@ -84,9 +83,9 @@ def run_har_comparison(file_path: Path, commodity_name: str):
         lag1_cols = [c for c in fam_cols if c.endswith("_lag1")]
 
         if lag0_cols:
-            variants[f"{fam}_lag0"] = lag0_cols
+            variants[f"HAR-X ({fam}, lag 0)"] = lag0_cols
         if lag1_cols:
-            variants[f"{fam}_lag1"] = lag1_cols
+            variants[f"HAR-X ({fam}, lag 1)"] = lag1_cols
 
     if not variants:
         # If no valid variants can be formed, we stop the comparison
@@ -129,18 +128,28 @@ def run_har_comparison(file_path: Path, commodity_name: str):
 
     # Results are ranked by improvement over the baseline HAR
     res = pd.DataFrame(results).sort_values(["Delta_R2"], ascending=False)
-
-    print(f"\n{'-'*20} {commodity_name.upper()} : IN-SAMPLE RESULTS {'-'*20}")
+    
+    print(f"\n---------- {commodity_name} ----------")
     pd.set_option("display.float_format", lambda x: f"{x:.5f}")
 
     print(
         res[["Variant", "R2_Base", "R2_Aug", "Delta_R2", "p-value"]]
-        .to_string(index=False)
-    )
+        .to_string(index=False))
 
     # For illustration, we display detailed output for the best-performing variant
     best_label = res.iloc[0]["Variant"] # Selects the HAR-X variant that achieved the largest improvement over the baseline HAR model
     best_cols = variants[best_label] # These are the conflict variables included in the best model
+
+    best = res.iloc[0]
+    if best["Delta_R2"] > 0 and best["p-value"] < 0.05:
+        conclusion = "HAR-X outperforms HAR in-sample and the improvement is statistically significant."
+    elif best["Delta_R2"] > 0 and best["p-value"] >= 0.05:
+        conclusion = "HAR-X slightly outperforms HAR in-sample, but the improvement is not statistically significant."
+    else:
+        conclusion = "HAR-X does not improve upon the baseline HAR model in-sample."
+
+    print(f"\n>>> Best Variant Details: {best_label}")
+    print(f"\nConclusion : ({commodity_name.upper()}): {conclusion}\n")
 
     # I keep only rows where all variables needed for the best model are available
     data_best = df.dropna(subset=features_base + best_cols + [target]).copy()
@@ -149,10 +158,8 @@ def run_har_comparison(file_path: Path, commodity_name: str):
         data_best[target],
         data_best[features_base + best_cols] ) # We re-estimate the best HAR-X model to inspect its coefficients.
 
-    print(f"\n>>> Best Variant Details: {best_label}")
     print(best_model.summary().tables[1])
-    print("=" * 60)
-
+    
 
 def fit_random_forest(
     X_train: pd.DataFrame,

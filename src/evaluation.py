@@ -1,7 +1,7 @@
-# src/evaluation.py
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+
 from scipy import stats
 from pathlib import Path
 
@@ -22,21 +22,19 @@ AI assistance was therefore used to:
 All modeling choices, assumptions, and final results were reviewed, understood,
 and validated by the author.
 """
-
-
-def dm_test(actual, pred1, pred2, h=1, loss_type="QLIKE", nw_lags=5):
-    """
-    Diebold-Mariano test with Newey-West long-run variance.
-    H0: equal predictive accuracy.
-    """
+def dm_test(actual, pred1, pred2, nw_lags=5):
+    
+    # Diebold-Mariano test with Newey-West long-run variance
+    # H0: equal predictive accuracy
+    
 
     # Convert to numpy for consistent computations
     actual = np.asarray(actual, dtype=float)
     pred1 = np.asarray(pred1, dtype=float)
     pred2 = np.asarray(pred2, dtype=float)
 
-    # QLIKE is standard for volatility forecasts; it requires strictly positive forecasts.
-    # We clip forecasts and actual volatility to avoid log(0) and numerical explosions.
+    # QLIKE is standard for volatility forecasts; it requires strictly positive forecasts
+    # We clip forecasts and actual volatility to avoid log(0) and numerical explosions
     pred1 = np.clip(pred1, 1e-3, None)
     pred2 = np.clip(pred2, 1e-3, None)
     actual = np.clip(actual, 1e-3, None)
@@ -82,8 +80,7 @@ def run_walk_forward(
     nw_lags_dm: int = 5,
     start_date: str = "2015-01-01",
     end_date: str = "2024-12-31",
-    rf_refit_every: int = 25,
-):
+    rf_refit_every: int = 25,):
     """
     Walk-forward OOS evaluation for:
       - HAR (baseline)
@@ -117,19 +114,18 @@ def run_walk_forward(
     # Candidate conflict columns (EWMA 0.94)
     candidates = [
         c for c in df.columns
-        if ("log_fatal" in c.lower()) and ("ewma_94" in c.lower())
-    ]
+        if ("log_deaths" in c.lower())
+        and ("ewma_94" in c.lower())
+        and c.endswith("_lag1")] # Using only lag-1 conflict variables to avoid any look-ahead bias
 
     # Select 1 conflict proxy consistent with H2
     name_lower = commodity_name.lower()
 
     if "wti" in name_lower or "oil" in name_lower:
-        conflict_cols = [c for c in candidates if "oil_focus" in c.lower()] \
-            or [c for c in candidates if "middle_east" in c.lower()]
+        conflict_cols = [c for c in candidates if "middle_east" in c.lower()]
 
     elif "gas" in name_lower:
-        conflict_cols = [c for c in candidates if "gas_focus" in c.lower()] \
-            or [c for c in candidates if "europe" in c.lower()]
+        conflict_cols = [c for c in candidates if "europe" in c.lower()]
 
     elif "gold" in name_lower:
         conflict_cols = [c for c in candidates if "global" in c.lower()] \
@@ -151,26 +147,15 @@ def run_walk_forward(
     data = df.dropna(subset=cols_required).copy()
     data = data.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
 
-    print("\n   --- DATA AVAILABILITY CHECK ---")
-    print("   rows after date filter        :", len(df))
-    print("   rows after dropna (used data) :", len(data))
-    print("   first usable date             :", data["Date"].min())
-    print("   last usable date              :", data["Date"].max())
-
-    print("\n   Missing values by required column:")
-    print(df[cols_required].isna().sum().sort_values(ascending=False))
-
-
     n_obs = len(data)
     if n_obs < window_size + 50:
         print(f"[Error] Not enough data ({n_obs} rows). Need at least {window_size + 50}.")
         return None
 
-    h = 1
     n_eval_points = n_obs - window_size
     n_expected = int(np.ceil(n_eval_points / max(int(step_size), 1)))
 
-    print(f"   Config: Window={window_size}, Step={step_size}, Horizon={h}, DM_NW_lags={nw_lags_dm}")
+    print(f"   Config: Window={window_size}, Step={step_size}, DM_NW_lags={nw_lags_dm}")
     print(f"   Expected forecasts: ~{n_expected}")
     if have_conflict:
         print(f"   RF refit every     : {rf_refit_every} steps (benchmark speed-up)")
@@ -208,6 +193,7 @@ def run_walk_forward(
                 ).iloc[0]
             )
             pb = max(pb, floor)
+        
         except Exception:
             n_fail["base"] += 1
             continue
@@ -257,9 +243,7 @@ def run_walk_forward(
                 "Actual": y_now,
                 "Pred_HAR": pb,
                 "Pred_HARX": pa,
-                "Pred_RF": pr,
-            }
-        )
+                "Pred_RF": pr})
 
         # Minimal progress feedback
         if len(rows) % 25 == 0:
@@ -277,8 +261,8 @@ def run_walk_forward(
         common = (
             np.isfinite(res["Pred_HAR"].values)
             & np.isfinite(res["Pred_HARX"].values)
-            & np.isfinite(res["Pred_RF"].values)
-        )
+            & np.isfinite(res["Pred_RF"].values))
+        
     else:
         common = np.isfinite(res["Pred_HAR"].values)
 
@@ -322,8 +306,8 @@ def run_walk_forward(
     print(f"\n   Best model (by QLIKE): {ranking[0][0]}")
 
     # Two DM tests only (focused on the research question)
-    dm_x, p_x = dm_test(a, ph, px, h=1, loss_type="QLIKE", nw_lags=nw_lags_dm)
-    dm_r, p_r = dm_test(a, ph, prf, h=1, loss_type="QLIKE", nw_lags=nw_lags_dm)
+    dm_x, p_x = dm_test(a, ph, px, nw_lags=nw_lags_dm)
+    dm_r, p_r = dm_test(a, ph, prf, nw_lags=nw_lags_dm)
 
     print(f"\n   --- Diebold-Mariano (QLIKE, NW={nw_lags_dm}) ---")
     print(f"   HAR vs HAR-X : stat={dm_x:.3f}, p={p_x:.4f}")
