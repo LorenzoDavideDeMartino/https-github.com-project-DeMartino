@@ -1,80 +1,69 @@
 # Commodity Volatility Forecasting Under Armed Conflict
-
-This project studies whether armed-conflict information contains predictive signals for commodity price volatility. Using daily data for major commodities (WTI crude oil futures, natural gas futures, and gold futures), the project compares a standard econometric baseline (HAR) with an augmented HAR-X specification that incorporates conflict intensity indices.
+This project examines whether information on armed conflicts helps predict commodity price volatility. It relies on daily data for WTI crude oil, natural gas, and gold futures. The analysis starts from a standard HAR model and extends it with a HAR-X specification that includes conflict intensity indices built from UCDP data. The project also compares these econometric models to a machine learning benchmark.
 
 ## Research question
-Do armed-conflict intensity and geographic location contain predictive information that improves out-of-sample forecasts of commodity price volatility compared to a standard HAR benchmark?
+The research question examines whether the intensity and geographic location of armed conflicts contain predictive information that improves out-of-sample forecasts of commodity price volatility relative to a standard HAR benchmark, and whether these effects remain competitive when compared to a simple machine learning reference model.
 
 ## Hypotheses 
 
 ### H1 — Conflict Intensity and Volatility
-- H1: The intensity of armed conflicts contains relevant information for the future dynamics of commodity price volatility.
+- H1: The first hypothesis is that the intensity of armed conflicts contains relevant information for the future dynamics of commodity price volatility.
 
-In this project, conflict intensity is measured using the number of fatalities reported in the UCDP dataset (best variable). Because fatality counts are highly skewed and display strong persistence over time, they are transformed using a logarithmic function and smoothed through an exponentially weighted moving average (EWMA).
+In this project, conflict intensity is measured using the number of fatalities reported in the UCDP dataset, based on the best estimate variable. Fatality counts are highly skewed and display strong persistence over time. For this reason, they are transformed using a logarithmic function and smoothed with an exponentially weighted moving average.
 
-This hypothesis examines whether conflict intensity provides predictive power for commodity volatility independently of geographical location, relying on a global conflict index.
+This hypothesis tests whether conflict intensity provides predictive information for commodity volatility independently of geographic location. The analysis therefore relies on a global conflict index as a baseline measure.
 
 ### H2 — Role of Geographic Exposure
-- H2: The effect of armed conflicts on commodity price volatility is likely to depend on where these conflicts occur, particularly when they affect regions that are economically or strategically important for the commodity in question.
+- H2: The second hypothesis states that the impact of armed conflicts on commodity price volatility depends on where these conflicts occur. The effect is expected to be stronger when conflicts take place in regions that are economically or strategically important for the commodity considered.
 
-For this reason, the analysis focuses on specific geographic exposures:
-- For WTI crude oil, conflicts located in the Middle East are expected to be most relevant.
-- For natural gas, conflicts occurring in Europe are considered particularly important.
-- For gold, which is commonly viewed as a safe-haven asset, global conflict intensity is used.
+The empirical analysis therefore focuses on commodity-specific geographic exposures. For WTI crude oil, conflicts located in the Middle East are considered the most relevant. For natural gas, conflicts occurring in Europe receive particular attention. For gold, which is commonly viewed as a safe-haven asset, global conflict intensity is used as the primary measure.
 
-This hypothesis motivates the construction of region-specific and commodity-focused conflict indices rather than relying solely on global measures.
+This hypothesis motivates the construction of region-specific conflict indices rather than relying exclusively on global measures, and it guides both the econometric and machine learning comparisons conducted in the project.
+
+### H3 — Non-linear effects and model comparison
+- H3: The third hypothesis states that the relationship between conflict intensity and commodity price volatility may be non-linear and therefore not fully captured by linear econometric models such as HAR or HAR-X.
+
+While HAR-X allows conflict information to enter the model in a linear way, it imposes strong functional form assumptions. Machine learning models, by contrast, can capture non-linear effects and interactions between volatility dynamics and conflict variables without imposing a predefined structure.
+
+This hypothesis tests whether a machine learning benchmark, using the same information set as HAR-X, delivers superior out-of-sample volatility forecasts. The comparison focuses on predictive performance rather than interpretability, and serves as a robustness check for the linear HAR-X results.
 
 ## Data
 ### Commodity prices (daily)
-The analysis relies on daily settlement prices of futures contracts for the following commodities:
-- WTI Crude Oil futures
-- Natural Gas futures
-- Gold futures
+The analysis relies on daily settlement prices of futures contracts for WTI crude oil, natural gas, and gold. The data are sourced from Investing.com.
 
-The data are obtained from Investing.com.
+Raw price series are downloaded as CSV files using U.S. regional settings. Due to platform length restrictions, the data are often split into several parts. These raw files are deliberately kept unchanged.
 
-Raw price data are downloaded as CSV files using U.S. regional settings and are often split into multiple parts due to platform-imposed length restrictions. These raw files are intentionally left unmodified and are cleaned, parsed, and merged using a fully reproducible Python pipeline (`src/data_loader.py`). The final output consists of one clean daily price series per commodity.
+All cleaning, parsing, and merging steps are handled by a fully reproducible Python pipeline implemented in (`src/data_loader.py`). The process produces one clean daily price series per commodity, which is then used consistently across the econometric and machine learning analyses.
 
 ### Conflict events (daily, georeferenced)
 - UCDP Georeferenced Event Dataset (GED), version 25.1
 
-The UCDP GED provides daily, georeferenced information on organized violence worldwide. Each observation corresponds to a violent event and includes information on the date, location, type of violence, and the estimated number of fatalities. Conflict intensity is proxied using the variable `best`, which represents the best available estimate of total fatalities for each event.
+The conflict data are drawn from the UCDP Georeferenced Event Dataset version 25.1. This dataset provides detailed, daily, and georeferenced information on organized violence worldwide. Each observation corresponds to a single violent event and reports the date, geographic location, type of violence, and an estimate of the number of fatalities. Conflict intensity is proxied using the variable best, which represents the most reliable estimate of total fatalities associated with each event.
 
-To ensure economic relevance and reduce noise, event-level data are filtered, aggregated to daily frequency, and transformed before entering the empirical analysis. Fatality counts are aggregated by day, transformed using a logarithmic function, and smoothed via an exponentially weighted moving average (EWMA). In addition to a global conflict index, region-specific and commodity-focused indices are constructed based on geographic exposure and key producer regions.
+This dataset is well suited for the analysis because fatality counts provide an objective and economically meaningful measure of conflict severity. Unlike simple event counts, fatalities capture both the intensity and persistence of violence, which are more likely to affect production conditions, trade flows, and investor uncertainty. To align conflict information with financial data, event-level observations are aggregated to the daily frequency.
 
 ## Target variable
 
-For each commodity, daily log-returns are first computed as
+Daily log returns are computed as:
+r_t = log(P_t) - log(P_{t-1})
 
-- r_t = log(P_t) − log(P_{t−1}),
+Daily realized volatility is defined as:
+RV_d,t = r_t^2
 
-where P_t denotes the daily futures price.
+Weekly and monthly realized volatility are computed as rolling averages over
+5 and 21 trading days, respectively.
 
-Following standard practice in the volatility forecasting literature, realized volatility is used as an ex post proxy for conditional variance. At each date t, realized volatility over a monthly horizon is defined as the sum of squared daily returns over a rolling window of 21 trading days,
-
-- RV_t^{(21)} = ∑_{i=0}^{20} r_{t−i}².
-
-This backward-looking measure captures recent market uncertainty and forms a key component of the baseline volatility dynamics.
-
-The main forecast target of the study is future realized volatility over the next 21 trading days,
-
-- RV_{t+1}^{(21)} = ∑_{i=1}^{21} r_{t+i}².
-
-This quantity is not observable at time t and therefore provides a natural target for out-of-sample forecast evaluation. All models rely exclusively on information available up to date t when forming forecasts, ensuring that no look-ahead bias is introduced.
+The forecast target is next-day realized volatility:
+Target_RV = RV_d,t+1
+which is not observable at time 𝑡. All models generate forecasts using only information available up to date 𝑡, ensuring a strict out-of-sample setting and avoiding any look-ahead bias.
 
 ## Conflict indices and features
 
-Armed-conflict information is incorporated through a set of daily conflict intensity indices constructed from the UCDP Georeferenced Event Dataset.
+Armed-conflict information is incorporated using daily conflict intensity indices constructed from the UCDP Georeferenced Event Dataset. Conflict intensity is proxied by the number of fatalities reported for each event, measured by the variable best.
 
-At the event level, conflict intensity is proxied by the number of fatalities reported for each event (variable `best`). Event-level observations are aggregated to the daily frequency in order to align conflict information with financial data. Because fatality counts are highly skewed and characterized by occasional extreme values, daily fatalities are transformed using a logarithmic transformation of the form
+Event-level observations are aggregated to the daily frequency to align conflict data with financial markets. Because fatality counts are highly skewed and noisy, daily totals are transformed using a logarithmic transformation and smoothed with an exponentially weighted moving average using a fixed decay parameter of 0.94.
 
-- log(1 + fatalities).
-
-To capture persistence in geopolitical risk while emphasizing recent events, the transformed series are smoothed using an exponentially weighted moving average (EWMA) with a fixed decay parameter λ = 0.94.
-
-Conflict indices are constructed at different levels of aggregation. In addition to a global conflict intensity index, region-specific and commodity-focused indices are built based on geographic exposure and the economic relevance of conflict locations for each commodity.
-
-All conflict variables enter the empirical models in lagged form, ensuring that only information available prior to the forecast date is used. This strict lag structure prevents information leakage and guarantees a clean out-of-sample evaluation.
+In addition to a global conflict index, region-specific and commodity-relevant indices are constructed to reflect geographic exposure. All conflict variables enter the models in lagged form, ensuring that forecasts rely only on information available at the time of prediction and avoiding any look-ahead bias.
 
 ## Project Structure
 
@@ -85,31 +74,30 @@ commodity-volatility-conflict/
 ├── README.md              # Project overview and instructions
 ├── PROPOSAL.md            # Project proposal
 ├── requirements.txt       # Python dependencies
-├── main.py                # Orchestrator script (Runs the full ETL Pipeline)
+├── main.py                # Orchestrator script (runs the full pipeline)
 │
 ├── data/
 │   ├── raw/
-│   │   ├── commodities/   # Raw CSV downloads from Investing.com (split in parts)
-│   │   └── conflicts/     # Raw UCDP GED CSV (GEDEvent_v25_1.csv)
+│   │   ├── commodities/   # Raw CSV downloads from Investing.com
+│   │   └── conflicts/     # Raw UCDP GED data
 │   └── processed/
-│       ├── commodities/   # Cleaned continuous price series
-│       ├── features/      # Intermediate volatility features
-│       ├── conflicts/     # Reduced and sorted conflict events
-│       ├── indices/       # Daily Conflict Indices (EWMA, Regional, Focus Countries)
-│       └── model_datasets/# FINAL DATASETS: Aligned Price + Volatility + Conflict Lags
+│       ├── commodities/   # Cleaned price series
+│       ├── features/      # Volatility features (RV)
+│       ├── conflicts/     # Reduced conflict events
+│       ├── indices/       # Daily conflict indices (EWMA, regions)
+│       └── model_datasets # Final datasets for modeling
 │
 ├── src/
-│   ├── __init__.py
-│   ├── data_loader.py           # Step 1: Cleaning & merging raw commodity price data
-│   ├── features.py              # Step 1b: Realized volatility (RV) calculation
-│   ├── conflict_loader.py       # Step 2: Cleaning & reducing raw UCDP data
-│   ├── conflict_index_builder.py # Step 3: Aggregating events into daily time-series (EWMA)
-│   ├── build_model_dataset.py   # Step 4: Merging commodities with conflict indices (Lags/Target)
-│   └── models/                  # Step 5: HAR, HAR-X
+│   ├── data_loader.py           # Step 1: Commodity data cleaning
+│   ├── features.py              # Step 1b: Realized volatility construction
+│   ├── conflict_loader.py       # Step 2: Conflict data reduction
+│   ├── conflict_index_builder.py# Step 3: Conflict index construction
+│   ├── build_model_dataset.py   # Step 4: Final dataset assembly
+│   ├── models.py                # Step 5: HAR and HAR-X models
+│   └── evaluation.py            # Step 6: Walk-forward OOS evaluation & DM tests
 │
-└── results/               # (Upcoming) Figures and forecast evaluation tables
+└── results/               # Forecast evaluation outputs
 ```
-
 ## How to run the project
 
 The entire project is executed through the main pipeline script.
@@ -121,6 +109,12 @@ python main.py
 will reproduce the full workflow, including data cleaning, feature construction, conflict index building, dataset assembly, model estimation, and out-of-sample evaluation.
 
 All results are generated deterministically from the raw input data.
+
+All raw commodity price files used in the project are included in the GitHub repository. The raw UCDP Georeferenced Event Dataset is not included because of its large size. Instead, the repository contains a reduced and preprocessed version of the dataset that is sufficient to reproduce all results.
+
+If the project is run fully from scratch, the original UCDP GED file must be downloaded manually from the UCDP website and placed in the directory data/raw/conflicts/. Once the file is available, running python main.py will rebuild the reduced conflict dataset, construct the conflict indices, and reproduce the full analysis pipeline.
+
+(The original UCDP Georeferenced Event Dataset can be downloaded from the [UCDP download page](https://ucdp.uu.se/downloads/).)
 
 ## Requirements
 
@@ -134,12 +128,13 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 - matplotlib
 - seaborn
 
-### Econometrics and statistics
+### Econometrics, statistics and ML
 - statsmodels
+- scipy
+- scikit-learn
 
 ### Utilities
 - pathlib (standard library)
-
 
 ## Author
 Lorenzo Davide De Martino  
