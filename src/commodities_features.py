@@ -33,11 +33,11 @@ def build_features_df(df: pd.DataFrame, price_col: str = "Price", date_col: str 
     out["RV_Weekly"] = out["RV_Daily"].rolling(5).mean()
     out["RV_Monthly"] = out["RV_Daily"].rolling(22).mean()
 
-    # Rows with missing long-horizon volatility are removed to ensure that the target variable is well defined. 
+    # Rows with missing long-horizon volatility are removed to ensure that the target variable is well defined
     out = out.dropna(subset=["RV_Monthly"])
 
     # Intermediate or unused columns are removed to keep the dataset focused on variables that are actually used in the models
-    cols_to_drop = ["High", "Low"]
+    cols_to_drop = ["High", "Low", "Open", "Vol.", "Change %"]
     out = out.drop(columns=cols_to_drop, errors="ignore")
 
     return out
@@ -53,17 +53,11 @@ def process_features_file(input_path: Path, output_path: Path):
     # Raw data are loaded from disk before feature construction
     df = pd.read_csv(input_path)
 
-    try:
-        # Feature construction is isolated in a single function to keep the logic clear and testable.
-        df_features = build_features_df(df)
+    # Feature construction is isolated in a single function to keep the logic clear and testable.
+    df_features = build_features_df(df)
 
-        # The output directory is created upfront to avoid save errors (<- IA Sugesstion)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        df_features.to_csv(output_path, index=False)
+    # The output directory is created upfront to avoid save errors (<- IA Sugesstion)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df_features.to_csv(output_path, index=False)
 
-        print(f"Features generated {output_path} - Rows: {len(df_features)}")
-
-    except KeyError as e:
-        # Structural data issues are reported explicitly to make failures visible.
-        print(f"Error processing {input_path.name}")
-
+    print(f"Features generated {output_path} - Rows: {len(df_features)}")

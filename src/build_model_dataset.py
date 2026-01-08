@@ -115,6 +115,7 @@ def build_dataset_for_commodity(
         "RV_Daily",
         "RV_Weekly",
         "RV_Monthly"]
+    
     conflict_features = list(dict.fromkeys(conflict_features)) # <- IA Input, # Remove potential duplicate conflict variables while preserving their original order
     final_cols = base_cols + conflict_features
 

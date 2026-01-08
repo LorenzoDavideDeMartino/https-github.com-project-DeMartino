@@ -1,75 +1,10 @@
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+import matplotlib.pyplot as plt
 
-from scipy import stats
 from pathlib import Path
-
 from src.models import fit_random_forest, predict_random_forest
-"""
-This evaluation module was developed with substantial assistance from AI tools.
-
-The initial implementation of the walk-forward evaluation was written by the author,
-but severe computational and numerical issues were encountered (very long runtimes,
-unstable loss values, and repeated model refitting).
-
-AI assistance was therefore used to:
-- simplify the evaluation design,
-- reduce unnecessary computations,
-- stabilize the QLIKE loss numerically,
-- and improve code efficiency while preserving econometric validity.
-
-All modeling choices, assumptions, and final results were reviewed, understood,
-and validated by the author.
-"""
-def dm_test(actual, pred1, pred2, nw_lags=5):
-    
-    # Diebold-Mariano test with Newey-West long-run variance
-    # H0: equal predictive accuracy
-    
-
-    # Convert to numpy for consistent computations
-    actual = np.asarray(actual, dtype=float)
-    pred1 = np.asarray(pred1, dtype=float)
-    pred2 = np.asarray(pred2, dtype=float)
-
-    # QLIKE is standard for volatility forecasts; it requires strictly positive forecasts
-    # We clip forecasts and actual volatility to avoid log(0) and numerical explosions
-    pred1 = np.clip(pred1, 1e-3, None)
-    pred2 = np.clip(pred2, 1e-3, None)
-    actual = np.clip(actual, 1e-3, None)
-
-    loss1 = np.log(pred1) + actual / pred1
-    loss2 = np.log(pred2) + actual / pred2
-    d = loss1 - loss2
-
-    d = np.asarray(d, dtype=float)
-    T = len(d)
-
-    # Too few points -> DM test is not reliable
-    if T < 30:
-        return np.nan, np.nan
-
-    d_bar = d.mean()
-    dc = d - d_bar
-
-    # Newey-West long-run variance for serial correlation in loss differences
-    gamma0 = np.mean(dc * dc)
-    var_hat = gamma0
-
-    for L in range(1, int(nw_lags) + 1):
-        w = 1.0 - L / (nw_lags + 1.0)
-        gammaL = np.mean(dc[L:] * dc[:-L])
-        var_hat += 2.0 * w * gammaL
-
-    if var_hat < 1e-18:
-        return 0.0, 1.0
-
-    dm_stat = d_bar / np.sqrt(var_hat / T)
-
-    # Two-sided p-value (we test "different", not one-direction)
-    p_value = 2 * (1 - stats.t.cdf(np.abs(dm_stat), df=T - 1))
-    return float(dm_stat), float(p_value)
 
 
 def run_walk_forward(
@@ -77,240 +12,184 @@ def run_walk_forward(
     commodity_name: str,
     window_size: int = 750,
     step_size: int = 5,
-    nw_lags_dm: int = 5,
     start_date: str = "2015-01-01",
     end_date: str = "2024-12-31",
-    rf_refit_every: int = 25,):
-    """
-    Walk-forward OOS evaluation for:
-      - HAR (baseline)
-      - HAR-X (HAR + 1 conflict proxy, lag1 only)
-      - Random Forest (same inputs as HAR-X, non-linear benchmark)
+    rf_refit_every: int = 25):
 
-    Output: DataFrame with Date, Actual, Pred_HAR, Pred_HARX, Pred_RF
-    """
+    print(f"OUT-OF-SAMPLE FORECAST: {commodity_name}")
 
-    print(f"OUT-OF-SAMPLE FORECAST (WALK-FORWARD): {commodity_name}")
+    # Load the final modeling dataset and restrict to a recent regime
+    # This avoids mixing very different volatility regimes and reduces runtime
+    data = pd.read_csv(file_path, parse_dates=["Date"])
+    data = data[(data["Date"] >= start_date) & (data["Date"] <= end_date)].copy()
 
-    file_path = Path(file_path)
-    if not file_path.exists():
-        print(f"Attention: File not found: {file_path}")
-        return None
+    # Standard HAR features 
+    features_har = ["RV_Daily", "RV_Weekly", "RV_Monthly"]
+    target_var = "Target_RV"
 
-    df = pd.read_csv(file_path, parse_dates=["Date"])
+    # Conflict variables must be lagged (lag 1 only) to avoid look-ahead bias
+    conflict_candidates = [
+        c for c in data.columns
+        if "log_deaths" in c.lower()
+        and "ewma_94" in c.lower()
+        and c.endswith("_lag1")]
 
-    # WHY: restrict to a recent regime to reduce runtime and avoid mixing very different market periods
-    df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)].copy()
-
-    # HAR features and target
-    features_base = ["RV_Daily", "RV_Weekly", "RV_Monthly"]
-    target = "Target_RV"
-
-    missing = [c for c in ["Date"] + features_base + [target] if c not in df.columns]
-    if missing:
-        print(f"[Critical Error] Missing columns: {missing}")
-        return None
-
-    # Candidate conflict columns (EWMA 0.94)
-    candidates = [
-        c for c in df.columns
-        if ("log_deaths" in c.lower())
-        and ("ewma_94" in c.lower())
-        and c.endswith("_lag1")] # Using only lag-1 conflict variables to avoid any look-ahead bias
-
-    # Select 1 conflict proxy consistent with H2
-    name_lower = commodity_name.lower()
-
-    if "wti" in name_lower or "oil" in name_lower:
-        conflict_cols = [c for c in candidates if "middle_east" in c.lower()]
-
-    elif "gas" in name_lower:
-        conflict_cols = [c for c in candidates if "europe" in c.lower()]
-
-    elif "gold" in name_lower:
-        conflict_cols = [c for c in candidates if "global" in c.lower()] \
-            or [c for c in candidates if "middle_east" in c.lower()]
-
+    # Commodity-specific regional exposure (Hypothesis H2)
+    name = commodity_name.lower()
+    if "wti" in name or "oil" in name:
+        conflict_vars = [c for c in conflict_candidates if "middle_east" in c.lower()]
+    elif "gas" in name:
+        conflict_vars = [c for c in conflict_candidates if "europe" in c.lower()]
+    elif "gold" in name:
+        conflict_vars = [c for c in conflict_candidates if "global" in c.lower()]
     else:
-        conflict_cols = candidates
+        conflict_vars = []
 
-    # OOS must use lag1 only
-    final_conflicts = sorted([c for c in conflict_cols if c.endswith("_lag1")])[:1]
-    have_conflict = len(final_conflicts) == 1
+    # WHY: We include at most one conflict proxy to keep interpretation clean
+    conflict_var = conflict_vars[0] if len(conflict_vars) > 0 else None
+    use_conflict = conflict_var is not None
 
-    if have_conflict:
-        print(f"   Selected Feature for OOS: {final_conflicts[0]}")
+    if use_conflict:
+        print(f"Selected conflict feature: {conflict_var}")
+        features_harx = features_har + [conflict_var]
     else:
-        print("[Info] No suitable lag1 conflict column found. We run HAR only (no HAR-X, no RF).")
+        print("No conflict variable found : HAR only")
+        features_harx = features_har
 
-    cols_required = ["Date"] + features_base + [target] + (final_conflicts if have_conflict else [])
-    data = df.dropna(subset=cols_required).copy()
-    data = data.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
+    # Keep only complete observations used in estimation and forecasting
+    required_cols = ["Date"] + features_harx + [target_var]
+    data = data[required_cols].dropna().reset_index(drop=True)
 
-    n_obs = len(data)
-    if n_obs < window_size + 50:
-        print(f"[Error] Not enough data ({n_obs} rows). Need at least {window_size + 50}.")
-        return None
+    # WHY: Walk-forward evaluation mimics real-time forecasting
+    results = []
 
-    n_eval_points = n_obs - window_size
-    n_expected = int(np.ceil(n_eval_points / max(int(step_size), 1)))
-
-    print(f"   Config: Window={window_size}, Step={step_size}, DM_NW_lags={nw_lags_dm}")
-    print(f"   Expected forecasts: ~{n_expected}")
-    if have_conflict:
-        print(f"   RF refit every     : {rf_refit_every} steps (benchmark speed-up)")
-
-    # Inputs for HAR-X / RF (same information set)
-    X_aug = features_base + (final_conflicts if have_conflict else [])
-    rf_features = X_aug[:]
-
-    rows = []
-    n_fail = {"base": 0, "aug": 0, "rf": 0}
-
-    # RF cache (refit less often)
     rf_model = None
-    rf_last_fit_t = None
+    rf_last_fit_index = None
 
-    for t in range(window_size, n_obs, step_size):
-        train = data.iloc[t - window_size:t]
-        x_now = data.iloc[[t]]
+    for t in range(window_size, len(data), step_size):
 
-        # Floor: keep QLIKE stable (no near-zero values)
-        floor = 1e-3
+        train = data.iloc[t - window_size : t]
+        test = data.iloc[[t]]
 
-        y_now = float(x_now.iloc[0][target])
-        y_now = max(y_now, floor)
+        actual_vol = float(test[target_var].iloc[0])
 
-        # --- HAR (baseline) ---
-        try:
-            m_base = sm.OLS(
-                train[target],
-                sm.add_constant(train[features_base], has_constant="add"),
+        # HAR baseline (linear benchmark)
+        har_model = sm.OLS(
+            train[target_var],
+            sm.add_constant(train[features_har], has_constant="add")).fit()
+
+        har_pred = float(
+            har_model.predict(
+                sm.add_constant(test[features_har], has_constant="add")).iloc[0])
+
+        harx_pred = np.nan
+        rf_pred = np.nan
+
+        if use_conflict:
+            # WHY: HAR-X tests whether conflict intensity adds predictive information
+            harx_model = sm.OLS(
+                train[target_var],
+                sm.add_constant(train[features_harx], has_constant="add")
             ).fit()
-            pb = float(
-                m_base.predict(
-                    sm.add_constant(x_now[features_base], has_constant="add")
-                ).iloc[0]
-            )
-            pb = max(pb, floor)
-        
-        except Exception:
-            n_fail["base"] += 1
-            continue
 
-        pa = np.nan
-        pr = np.nan
+            harx_pred = float(
+                harx_model.predict(
+                    sm.add_constant(test[features_harx], has_constant="add")
+                ).iloc[0])
 
-        if have_conflict:
-            # --- HAR-X ---
-            try:
-                m_aug = sm.OLS(
-                    train[target],
-                    sm.add_constant(train[X_aug], has_constant="add"),
-                ).fit()
-                pa = float(
-                    m_aug.predict(
-                        sm.add_constant(x_now[X_aug], has_constant="add")
-                    ).iloc[0]
-                )
-                pa = max(pa, floor)
-            except Exception:
-                n_fail["aug"] += 1
-                pa = np.nan
+            # Random Forest used as a non-linear benchmark
+            # Refit only occasionally to reduce computation time
+            if rf_model is None or (t - rf_last_fit_index) >= rf_refit_every:
+                rf_model = fit_random_forest(
+                    train[features_harx],
+                    train[target_var],
+                    random_state=42)
+                
+                rf_last_fit_index = t
 
-            # --- RF benchmark (refit less often) ---
-            try:
-                need_refit = (
-                    rf_model is None
-                    or rf_last_fit_t is None
-                    or ((t - rf_last_fit_t) >= rf_refit_every)
-                )
-                if need_refit:
-                    rf_model = fit_random_forest(
-                        train[rf_features], train[target], random_state=42
-                    )
-                    rf_last_fit_t = t
+            rf_pred = float(
+                predict_random_forest(rf_model, test[features_harx])[0])
 
-                pr = float(predict_random_forest(rf_model, x_now[rf_features])[0])
-                pr = max(pr, floor)
-            except Exception:
-                n_fail["rf"] += 1
-                pr = np.nan
+        results.append({
+            "Date": test["Date"].iloc[0],
+            "Actual": actual_vol,
+            "HAR": har_pred,
+            "HAR_X": harx_pred,
+            "RF": rf_pred,})
 
-        rows.append(
-            {
-                "Date": x_now.iloc[0]["Date"],
-                "Actual": y_now,
-                "Pred_HAR": pb,
-                "Pred_HARX": pa,
-                "Pred_RF": pr})
+        if len(results) % 25 == 0:
+            print(f"Progress: {len(results)}")
 
-        # Minimal progress feedback
-        if len(rows) % 25 == 0:
-            print(f"   Progress: {len(rows)} / ~{n_expected}")
+    # WHY: Drop rows with missing forecasts to ensure fair comparison
+    results_df = pd.DataFrame(results).dropna()
 
-    if len(rows) < 50:
-        print("[Error] Too few forecasts generated.")
-        print(f"   Failures: {n_fail}")
-        return None
+    # Evaluation metrics
+    y = results_df["Actual"].to_numpy()
+    y_har = results_df["HAR"].to_numpy()
+    y_harx = results_df["HAR_X"].to_numpy()
+    y_rf = results_df["RF"].to_numpy()
 
-    res = pd.DataFrame(rows)
+    # MAE measures average absolute forecast error (robust to outliers)
+    def mae(a, b):
+        return np.mean(np.abs(a - b))
 
-    # Compare all models on the SAME dates (common sample)
-    if have_conflict:
-        common = (
-            np.isfinite(res["Pred_HAR"].values)
-            & np.isfinite(res["Pred_HARX"].values)
-            & np.isfinite(res["Pred_RF"].values))
-        
-    else:
-        common = np.isfinite(res["Pred_HAR"].values)
+    # RMSE penalizes large forecast errors more strongly
+    def rmse(a, b):
+        return np.sqrt(np.mean((a - b) ** 2))
 
-    res_c = res.loc[common].copy()
+    # RMSE on logs evaluates relative (proportional) forecast accuracy
+    # Small floor is applied only for numerical stability
+    eps = max(1e-12, np.quantile(y, 0.01) * 0.1)
 
-    print("\n   --- QUALITY CHECK ---")
-    print(f"   Forecasts stored : {len(res)}")
-    print(f"   Forecasts used   : {len(res_c)} (common sample)")
-    print(f"   Date range (OOS) : {res_c['Date'].min()} -> {res_c['Date'].max()}")
-    print(f"   Failures         : base={n_fail['base']}, aug={n_fail['aug']}, rf={n_fail['rf']}")
+    def rmse_log(a, b):
+        a = np.clip(a, eps, None)
+        b = np.clip(b, eps, None)
+        return np.sqrt(np.mean((np.log(a) - np.log(b)) ** 2))
 
-    if len(res_c) < 50:
-        print("[Error] Too few common-sample forecasts to compare models.")
-        return res
+    # Evaluation matrix summarizing forecast performance by model
+    metrics = pd.DataFrame({
+        "Model": ["HAR", "HAR-X", "RF"],
+        "MAE": [
+            mae(y, y_har),
+            mae(y, y_harx),
+            mae(y, y_rf),
+        ],
+        "RMSE": [
+            rmse(y, y_har),
+            rmse(y, y_harx),
+            rmse(y, y_rf),
+        ],
+        "RMSE_log": [
+            rmse_log(y, y_har),
+            rmse_log(y, y_harx),
+            rmse_log(y, y_rf),
+        ]})
 
-    a = res_c["Actual"].to_numpy(float)
-    ph = res_c["Pred_HAR"].to_numpy(float)
+    print("\nEvaluation metrics:")
+    print(metrics)
 
-    qlike_har = float(np.mean(np.log(ph) + a / ph))
+    # Export results
 
-    print(f"\n   --- RESULTS: {commodity_name.upper()} (COMMON SAMPLE) ---")
-    print(f"   QLIKE HAR   : {qlike_har:.6f}")
+    # One folder per commodity for GitHub clarity
+    out_dir = Path("results") / "out_of_sample" / commodity_name.upper()
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    if not have_conflict:
-        print("   Note: HAR-X and RF skipped (no lag1 conflict feature available).")
-        return res
+    # Forecast paths (time series)
+    results_df.to_csv(out_dir / "forecasts.csv", sep=";", float_format="%.6f")
 
-    px = res_c["Pred_HARX"].to_numpy(float)
-    prf = res_c["Pred_RF"].to_numpy(float)
+    # Evaluation matrix (model comparison table)
+    metrics.to_csv(out_dir / "metrics.csv", sep=";", float_format="%.6f")
 
-    qlike_harx = float(np.mean(np.log(px) + a / px))
-    qlike_rf = float(np.mean(np.log(prf) + a / prf))
+    # Visual comparison of out-of-sample forecasts
+    plt.figure(figsize=(10, 4))
+    plt.plot(results_df["Date"], results_df["Actual"], label="Actual", linewidth=2)
+    plt.plot(results_df["Date"], results_df["HAR"], label="HAR")
+    plt.plot(results_df["Date"], results_df["HAR_X"], label="HAR-X")
+    plt.plot(results_df["Date"], results_df["RF"], label="RF")
+    plt.legend()
+    plt.title(f"{commodity_name.upper()} — Out-of-sample forecasts")
+    plt.tight_layout()
+    plt.savefig(out_dir / "forecast_plot.png", dpi=150)
+    plt.close()
 
-    print(f"   QLIKE HAR-X : {qlike_harx:.6f}")
-    print(f"   QLIKE RF    : {qlike_rf:.6f}")
-
-    ranking = sorted(
-        [("HAR", qlike_har), ("HAR-X", qlike_harx), ("RF", qlike_rf)],
-        key=lambda x: x[1],
-    )
-    print(f"\n   Best model (by QLIKE): {ranking[0][0]}")
-
-    # Two DM tests only (focused on the research question)
-    dm_x, p_x = dm_test(a, ph, px, nw_lags=nw_lags_dm)
-    dm_r, p_r = dm_test(a, ph, prf, nw_lags=nw_lags_dm)
-
-    print(f"\n   --- Diebold-Mariano (QLIKE, NW={nw_lags_dm}) ---")
-    print(f"   HAR vs HAR-X : stat={dm_x:.3f}, p={p_x:.4f}")
-    print(f"   HAR vs RF    : stat={dm_r:.3f}, p={p_r:.4f}")
-
-    return res
+    return results_df

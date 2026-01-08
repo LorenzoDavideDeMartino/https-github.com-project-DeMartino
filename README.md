@@ -55,7 +55,7 @@ Weekly and monthly realized volatility are computed as rolling averages over
 
 The forecast target is next-day realized volatility:
 Target_RV = RV_d,t+1
-which is not observable at time 𝑡. All models generate forecasts using only information available up to date 𝑡, ensuring a strict out-of-sample setting and avoiding any look-ahead bias.
+which is not observable at time 𝑡. All models generate forecasts using only information available up to date 𝑡, avoiding any look-ahead bias.
 
 ## Conflict indices and features
 
@@ -104,11 +104,12 @@ The entire project is executed through the main pipeline script.
 
 After installing the required dependencies, running
 
-python main.py
+- python main.py
 
 will reproduce the full workflow, including data cleaning, feature construction, conflict index building, dataset assembly, model estimation, and out-of-sample evaluation.
 
 All results are generated deterministically from the raw input data.
+
 
 All raw commodity price files used in the project are included in the GitHub repository. The raw UCDP Georeferenced Event Dataset is not included because of its large size. Instead, the repository contains a reduced and preprocessed version of the dataset that is sufficient to reproduce all results.
 

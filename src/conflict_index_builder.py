@@ -15,8 +15,6 @@ def build_daily_panels(
     start_date: str = "1990-01-01",
     end_date: str = "2024-12-31"):
 
-    print(f"Building Indices from {input_file}")
-
     input_file = Path(input_file)
     out_dir = Path(out_dir)
 

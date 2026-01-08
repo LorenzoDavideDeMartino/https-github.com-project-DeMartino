@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
 from pathlib import Path
 
 from sklearn.ensemble import RandomForestRegressor
@@ -24,6 +26,9 @@ def run_har_comparison(file_path: Path, commodity_name: str):
     # I need to load the final regression dataset prepared by the pipeline
     df = pd.read_csv(file_path, parse_dates=["Date"])
 
+    out_dir = Path("results") / "in_sample" / commodity_name.upper()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     # Baseline HAR regressors, as defined in the original HAR framework
     features_base = ["RV_Daily", "RV_Weekly", "RV_Monthly"]
     target = "Target_RV"
@@ -41,15 +46,6 @@ def run_har_comparison(file_path: Path, commodity_name: str):
         if ("log_deaths" in c.lower())
         and (EWMA_KEEP in c.lower())
         and (c.endswith("_lag0") or c.endswith("_lag1"))]
-
-    if not candidates:
-        # If no conflict variables are present, we only estimate the baseline HAR
-        data_common = df.dropna(subset=features_base + [target]).copy()
-        model_base = _fit_ols_hac(data_common[target], data_common[features_base])
-
-        print(f"\n=== {commodity_name.upper()} : BASELINE ONLY (No Conflicts) ===")
-        print(model_base.summary().tables[1])
-        return
 
     name = commodity_name.lower()
 
@@ -104,6 +100,7 @@ def run_har_comparison(file_path: Path, commodity_name: str):
         base = _fit_ols_hac(
             data_common[target],
             data_common[features_base])
+        
         aug = _fit_ols_hac(
             data_common[target],
             data_common[features_base + conf_cols])
@@ -123,12 +120,23 @@ def run_har_comparison(file_path: Path, commodity_name: str):
             "p-value": float(f_test.pvalue)})
 
     if not results:
-        print(f"No sufficient data for {commodity_name}.")
+        print(f"No sufficient data for {commodity_name}")
         return
 
     # Results are ranked by improvement over the baseline HAR
     res = pd.DataFrame(results).sort_values(["Delta_R2"], ascending=False)
-    
+
+    # Save HAR vs HAR-X comparison table
+    res_rounded = res.copy()
+    res_rounded = res_rounded.apply(
+        lambda s: s.round(6) if np.issubdtype(s.dtype, np.number) else s)
+
+    res_rounded.to_csv(
+        out_dir / "comparison.csv",
+        sep=";",
+        index=False,
+        float_format="%.6f")
+
     print(f"\n---------- {commodity_name} ----------")
     pd.set_option("display.float_format", lambda x: f"{x:.5f}")
 
@@ -157,9 +165,10 @@ def run_har_comparison(file_path: Path, commodity_name: str):
     best_model = _fit_ols_hac(
         data_best[target],
         data_best[features_base + best_cols] ) # We re-estimate the best HAR-X model to inspect its coefficients.
-
-    print(best_model.summary().tables[1])
     
+    # WHY: Save coefficients of the best in-sample HAR-X model
+    coef_table = best_model.summary2().tables[1]
+    coef_table.to_csv(out_dir / "best_model_coefficients.csv", sep=";", float_format="%.6f", index=True)
 
 def fit_random_forest(
     X_train: pd.DataFrame,
@@ -167,8 +176,6 @@ def fit_random_forest(
     random_state: int = 42):
     
     # Train a Random Forest model for volatility forecasting
-
-    # The Random Forest is used as a non-linear benchmark
     # It can capture interactions and non-linear effects that linear HAR-type models cannot
  
     # A moderate number of trees is sufficient for a robust benchmark and keeps computation time reasonable

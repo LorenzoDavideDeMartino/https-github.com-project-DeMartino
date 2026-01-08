@@ -56,9 +56,7 @@ def build_ucdp_reduced_sorted(input_file: Path, out_file: Path, chunk_size: int 
     # Events are aggregated by date, country, violence type, and region to obtain total daily conflict intensity measures.
     group_cols = ["date_start", "country", "type_of_violence", "region"]
     df_aggregated = (
-        df_reduced.groupby(group_cols)["best"]
-        .sum()
-        .reset_index())
+        df_reduced.groupby(group_cols)["best"].sum().reset_index())
 
     # Sorting ensures a clean and consistent chronological structure.
     df_aggregated = df_aggregated.sort_values(by=["date_start", "country"], ascending=[True, True]) 
@@ -76,7 +74,8 @@ def build_ucdp_reduced_sorted(input_file: Path, out_file: Path, chunk_size: int 
     # The final aggregated dataset is saved for downstream analysis.
     df_aggregated.to_csv(out_file, index=False)
 
-    print(f"UCDP sorted file generated: {out_file}")
+    print(f"UCDP sorted file generated")
+    print(f"Saved: {out_file}")
     print(f"Total Rows: {len(df_aggregated):,}")
 
     return df_aggregated
