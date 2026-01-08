@@ -71,32 +71,42 @@ The repository is organized to ensure reproducibility, clarity, and modularity.
 
 ```text
 commodity-volatility-conflict/
-├── README.md              # Project overview and instructions
+├── README.md              # Project overview, data description, and instructions
 ├── PROPOSAL.md            # Project proposal
 ├── requirements.txt       # Python dependencies
-├── main.py                # Orchestrator script (runs the full pipeline)
+├── main.py                # Main script (runs the full pipeline end-to-end)
 │
 ├── data/
 │   ├── raw/
 │   │   ├── commodities/   # Raw CSV downloads from Investing.com
-│   │   └── conflicts/     # Raw UCDP GED data
+│   │   └── conflicts/     # Raw UCDP GED data (NOT versioned on GitHub due to size)
+│   │
 │   └── processed/
-│       ├── commodities/   # Cleaned price series
-│       ├── features/      # Volatility features (RV)
-│       ├── conflicts/     # Reduced conflict events
-│       ├── indices/       # Daily conflict indices (EWMA, regions)
-│       └── model_datasets # Final datasets for modeling
+│       ├── commodities/   # Cleaned daily price series
+│       ├── features/      # Realized volatility features (RV)
+│       ├── conflicts/     # Reduced and sorted UCDP events
+│       ├── indices/       # Daily conflict indices (EWMA, regional, global)
+│       └── model_datasets/# Final datasets aligned for modeling
 │
 ├── src/
-│   ├── data_loader.py           # Step 1: Commodity data cleaning
-│   ├── features.py              # Step 1b: Realized volatility construction
-│   ├── conflict_loader.py       # Step 2: Conflict data reduction
-│   ├── conflict_index_builder.py# Step 3: Conflict index construction
-│   ├── build_model_dataset.py   # Step 4: Final dataset assembly
-│   ├── models.py                # Step 5: HAR and HAR-X models
-│   └── evaluation.py            # Step 6: Walk-forward OOS evaluation & DM tests
+│   ├── data_loader.py            # Step 1: Commodity data cleaning
+│   ├── features.py               # Step 1b: Realized volatility construction
+│   ├── conflict_loader.py        # Step 2: Conflict data reduction
+│   ├── conflict_index_builder.py # Step 3: Conflict index construction
+│   ├── build_model_dataset.py    # Step 4: Final dataset assembly
+│   ├── models.py                 # Step 5: HAR and HAR-X models (in-sample)
+│   └── evaluation.py             # Step 6: Walk-forward out-of-sample evaluation
 │
-└── results/               # Forecast evaluation outputs
+└── results/
+    ├── in_sample/         # In-sample HAR / HAR-X comparison tables
+    │   ├── WTI/
+    │   ├── GAS/
+    │   └── GOLD/
+    │
+    └── out_of_sample/     # Walk-forward forecast evaluation
+        ├── WTI/
+        ├── GAS/
+        └── GOLD/
 ```
 ## How to run the project
 
