@@ -149,12 +149,13 @@ def main():
                 out_path=out_p)
 
             final_files.append((commodity, out_p))
-
+ 
         else:
             print(f"Skip {commodity} (files missing)")
 
     # STEP 5: ANALYSIS (DIAGNOSTIC)
     print("----------Step 5----------")
+    print("Note: p-values test whether HAR-X provides a statistically significant improvement over HAR.")
     print("----In-Sample results-----")
     for name, fpath in final_files:
         if fpath.exists():
