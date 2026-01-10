@@ -166,7 +166,7 @@ def run_har_comparison(file_path: Path, commodity_name: str):
         data_best[target],
         data_best[features_base + best_cols] ) # We re-estimate the best HAR-X model to inspect its coefficients.
     
-    # WHY: Save coefficients of the best in-sample HAR-X model
+    # Save coefficients of the best in-sample HAR-X model
     coef_table = best_model.summary2().tables[1]
     coef_table.to_csv(out_dir / "best_model_coefficients.csv", sep=";", float_format="%.6f", index=True)
 
@@ -184,7 +184,7 @@ def fit_random_forest(
         max_depth= 10,
         min_samples_leaf= 5,
         random_state=random_state, # Guarantees reproducibility across runs and machines
-        n_jobs= 1) # WHY: repeated refits in walk-forward; -1 creates too much overhead
+        n_jobs= 1) # repeated refits in walk-forward; -1 creates too much overhead
 
     # The model learns the relationship between past information (X) and next-day volatility (y).
     model.fit(X_train, y_train)

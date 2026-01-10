@@ -150,15 +150,13 @@ def read_investing_raw_csv(path: Path):
         "Last": "Price",
         "Vol.": "Vol.",
         "Volume": "Vol.",
-        "Var. %": "Change %"
-    }
+        "Var. %": "Change %"}
+    
     df = df.rename(columns=rename_map)
 
     # Without a Date column, the data cannot be used for time-series analysis.
     if "Date" not in df.columns:
-        print(
-            f"Attention: 'Date' column not found in -> {path.name} "
-        )
+        print(f"Attention: 'Date' column not found in {path.name}")
         return pd.DataFrame()
 
     # Convert dates using the strict US format. Otherwise we could have maybe some bugs. 

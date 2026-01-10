@@ -54,9 +54,7 @@ def main():
             df_clean = pd.read_csv(clean_file)
         else:
             print(f"Creating clean file for ({clean_name})")
-            df_clean = build_clean_commodity_from_parts(
-                parts_dir=parts_dir,
-                out_file=clean_file)
+            df_clean = build_clean_commodity_from_parts(parts_dir=parts_dir, out_file=clean_file)
 
         # 2.1: Features (From the clean csv to the features)
         if feat_file.exists():
@@ -65,10 +63,7 @@ def main():
         else:
             if df_clean is not None and len(df_clean) > 0:
                 print(f"Creating commodities Features ({feat_name})")
-                df_feat = build_features_df(
-                    df_clean,
-                    price_col="Price",
-                    date_col="Date")
+                df_feat = build_features_df(df_clean, price_col="Price", date_col="Date")
                 
                 df_feat.to_csv(feat_file, index=False)
                 print(f"Saved: {feat_file}")
@@ -117,42 +112,46 @@ def main():
     out_models = repo / "data" / "processed" / "model_datasets"
     out_models.mkdir(parents=True, exist_ok=True)
 
-    # 1) Commodity
+    # 1) Commodity feature files
     comm_map = {
         "WTI":  out_feat / "crude_oil_wti_features.csv",
         "GAS":  out_feat / "natural_gas_features.csv",
         "GOLD": out_feat / "gold_features.csv"}
 
-    # 2) Conflict files (match conflict_index_builder outputs)
+    # 2) Conflict index files (match conflict_index_builder outputs)
     merge_config = {
         "WTI":  {"middle_east": out_indices / "conflict_daily_by_region.csv"},
         "GAS":  {"europe": out_indices / "conflict_daily_by_region.csv"},
-        "GOLD": {"global": out_indices / "conflict_daily_global.csv",
-                "middle_east": out_indices / "conflict_daily_by_region.csv"}}
+        "GOLD": {
+            "global": out_indices / "conflict_daily_global.csv",
+            "middle_east": out_indices / "conflict_daily_by_region.csv"}}
 
     final_files = []
 
-    # 3) Execution of the function for merge 
-    for name, conflict_map in merge_config.items():
-        valid_map = {k: v for k, v in conflict_map.items() if v is not None and v.exists()}
-        comm_file = comm_map.get(name)
+    # 3) Merge loop
+    for commodity, conflict_sources in merge_config.items():
 
-        out_p = out_models / f"{name.lower()}_dataset.csv"
+        available_conflicts = {
+            region: path
+            for region, path in conflict_sources.items()
+            if path is not None and path.exists()}
 
-        if comm_file and comm_file.exists() and valid_map:
+        commodity_file = comm_map.get(commodity)
+        out_p = out_models / f"{commodity.lower()}_dataset.csv"
+
+        if commodity_file and commodity_file.exists() and available_conflicts:
             build_dataset_for_commodity(
-            commodity_name=name,
-            commodity_features_csv=comm_file,
-            conflict_files=valid_map,
-            conflict_cols=["log_deaths_ewma_94"],
-            conflict_lags=[0, 1],
-            out_path=out_p)
-                
-            final_files.append((name, out_p))
+                commodity_name=commodity,
+                commodity_features_csv=commodity_file,
+                conflict_files=available_conflicts,
+                conflict_cols=["log_deaths_ewma_94"],
+                conflict_lags=[0, 1],
+                out_path=out_p)
+
+            final_files.append((commodity, out_p))
 
         else:
-            print(f"Skip {name} (files missing)")
-
+            print(f"Skip {commodity} (files missing)")
 
     # STEP 5: ANALYSIS (DIAGNOSTIC)
     print("----------Step 5----------")
@@ -161,7 +160,6 @@ def main():
         if fpath.exists():
             run_har_comparison(fpath, name)
     
-
     # STEP 6
     print("----------Step 6----------")
     print(f"Analysis window restricted from 2015-01-01 to 2024-12-31"

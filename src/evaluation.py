@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from src.models import fit_random_forest, predict_random_forest
 
-
 def run_walk_forward(
     file_path: Path,
     commodity_name: str,
@@ -45,7 +44,7 @@ def run_walk_forward(
     else:
         conflict_vars = []
 
-    # WHY: We include at most one conflict proxy to keep interpretation clean
+    # We include at most one conflict proxy to keep interpretation clean
     conflict_var = conflict_vars[0] if len(conflict_vars) > 0 else None
     use_conflict = conflict_var is not None
 
@@ -60,7 +59,7 @@ def run_walk_forward(
     required_cols = ["Date"] + features_harx + [target_var]
     data = data[required_cols].dropna().reset_index(drop=True)
 
-    # WHY: Walk-forward evaluation mimics real-time forecasting
+    # Walk-forward evaluation mimics real-time forecasting
     results = []
 
     rf_model = None
@@ -86,16 +85,14 @@ def run_walk_forward(
         rf_pred = np.nan
 
         if use_conflict:
-            # WHY: HAR-X tests whether conflict intensity adds predictive information
+            # HAR-X tests whether conflict intensity adds predictive information
             harx_model = sm.OLS(
                 train[target_var],
-                sm.add_constant(train[features_harx], has_constant="add")
-            ).fit()
+                sm.add_constant(train[features_harx], has_constant="add")).fit()
 
             harx_pred = float(
                 harx_model.predict(
-                    sm.add_constant(test[features_harx], has_constant="add")
-                ).iloc[0])
+                    sm.add_constant(test[features_harx], has_constant="add")).iloc[0])
 
             # Random Forest used as a non-linear benchmark
             # Refit only occasionally to reduce computation time
@@ -107,20 +104,19 @@ def run_walk_forward(
                 
                 rf_last_fit_index = t
 
-            rf_pred = float(
-                predict_random_forest(rf_model, test[features_harx])[0])
+            rf_pred = float(predict_random_forest(rf_model, test[features_harx])[0])
 
         results.append({
             "Date": test["Date"].iloc[0],
             "Actual": actual_vol,
             "HAR": har_pred,
             "HAR_X": harx_pred,
-            "RF": rf_pred,})
+            "RF": rf_pred})
 
         if len(results) % 25 == 0:
             print(f"Progress: {len(results)}")
 
-    # WHY: Drop rows with missing forecasts to ensure fair comparison
+    # Drop rows with missing forecasts to ensure fair comparison
     results_df = pd.DataFrame(results).dropna()
 
     # Evaluation metrics
@@ -182,10 +178,18 @@ def run_walk_forward(
 
     # Visual comparison of out-of-sample forecasts
     plt.figure(figsize=(10, 4))
+    
+    # 1. Tracé des courbes
     plt.plot(results_df["Date"], results_df["Actual"], label="Actual", linewidth=2)
     plt.plot(results_df["Date"], results_df["HAR"], label="HAR")
     plt.plot(results_df["Date"], results_df["HAR_X"], label="HAR-X")
     plt.plot(results_df["Date"], results_df["RF"], label="RF")
+
+    # 2. Zoom automatique (Calcul du max raisonnable sans le pic Covid)
+    robust_max = results_df["Actual"].quantile(0.995)
+    plt.ylim(0, robust_max * 1.1)
+
+    # 3. Finitions et sauvegarde
     plt.legend()
     plt.title(f"{commodity_name.upper()} — Out-of-sample forecasts")
     plt.tight_layout()

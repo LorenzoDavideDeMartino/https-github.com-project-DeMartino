@@ -45,17 +45,17 @@ This dataset is well suited for the analysis because fatality counts provide an 
 ## Target variable
 
 Daily log returns are computed as:
-r_t = log(P_t) - log(P_{t-1})
+- r_t = log(P_t) - log(P_{t-1})
 
-Daily realized volatility is defined as:
-RV_d,t = r_t^2
+Daily realized volatility is defined as the squared log return:
+- RV_d,t = r_t^2
 
-Weekly and monthly realized volatility are computed as rolling averages over
-5 and 21 trading days, respectively.
+To capture volatility persistence at different horizons, weekly and monthly realized volatility measures are constructed as rolling averages of daily realized volatility over 5 and 22 trading days.
 
 The forecast target is next-day realized volatility:
-Target_RV = RV_d,t+1
-which is not observable at time 𝑡. All models generate forecasts using only information available up to date 𝑡, avoiding any look-ahead bias.
+- Target_RVt = RVd,t+1
+	​
+This target is not observable at time 𝑡. All models therefore generate forecasts using only information available up to date 𝑡, including lagged realized volatility components and lagged conflict indices. This timing structure strictly avoids any look-ahead bias and ensures a clean out-of-sample forecasting framework.
 
 ## Conflict indices and features
 

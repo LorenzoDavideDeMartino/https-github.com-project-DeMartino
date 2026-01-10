@@ -8,7 +8,7 @@ While existing literature documents that conflicts affect commodity prices and v
 
 This project investigates the following research question:
 
-**Do armed-conflict characteristics contain predictive information that improves out-of-sample forecasts of commodity price volatility, particularly around conflict-related regime breaks?**
+**Do armed-conflict characteristics contain predictive information that improves out-of-sample forecasts of commodity price volatility?**
 
 The goal is to assess whether machine-learning models that incorporate detailed conflict-event information outperform traditional econometric benchmarks in forecasting commodity volatility.
 
@@ -26,7 +26,7 @@ The primary target variable is realized volatility, constructed as the sum of sq
 
 The project follows a comparative forecasting framework. At each point in time, models are estimated using only information available up to that date and are used to predict future realized volatility.
 
-First, standard benchmark models are implemented, including a naive random-walk volatility model and a GARCH(1,1) model estimated on daily returns. These models serve as reference points commonly used in the volatility forecasting literature.
+First, standard benchmark models are implemented, including a naive random-walk volatility model and a HARS model estimated on daily returns. These models serve as reference points commonly used in the volatility forecasting literature.
 
 Second, machine-learning models such as Random Forests and Gradient Boosting are trained using both traditional market-based predictors (lagged returns and lagged volatility measures) and conflict-related variables derived from the UCDP GED. The flexibility of these models allows them to capture nonlinear relationships and interactions between geopolitical events and volatility dynamics.
 
