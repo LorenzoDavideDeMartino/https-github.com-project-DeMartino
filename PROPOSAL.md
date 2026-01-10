@@ -26,12 +26,10 @@ The primary target variable is realized volatility, constructed as the sum of sq
 
 The project follows a comparative forecasting framework. At each point in time, models are estimated using only information available up to that date and are used to predict future realized volatility.
 
-First, standard benchmark models are implemented, including a naive random-walk volatility model and a HARS model estimated on daily returns. These models serve as reference points commonly used in the volatility forecasting literature.
+First, standard benchmark models are implemented. Second, machine-learning models such as Random Forests or Gradient Boosting are trained using traditional market-based predictors (lagged returns and lagged volatility measures) and conflict-related variables derived from the UCDP GED. The flexibility of these models allows them to capture nonlinear relationships and interactions between geopolitical events and volatility dynamics.
 
-Second, machine-learning models such as Random Forests and Gradient Boosting are trained using both traditional market-based predictors (lagged returns and lagged volatility measures) and conflict-related variables derived from the UCDP GED. The flexibility of these models allows them to capture nonlinear relationships and interactions between geopolitical events and volatility dynamics.
-
-Model performance is evaluated strictly out-of-sample using a walk-forward validation procedure. Forecast accuracy is assessed using loss functions appropriate for variance forecasting, including the QLIKE loss and mean squared error. Statistical significance of performance differences is assessed using Diebold–Mariano tests.
+Model performance is evaluated strictly out-of-sample using a walk-forward validation procedure. Forecast accuracy is assessed using loss functions appropriate for variance forecasting, including the QLIKE loss or mean squared error.
 
 ## Expected Contribution
 
-This project aims to contribute to the literature by providing a rigorous, out-of-sample comparison between econometric and machine-learning approaches to volatility forecasting in the presence of armed conflicts. By exploiting high-frequency conflict-event data, the study seeks to clarify whether geopolitical information delivers incremental predictive power beyond standard market indicators, particularly during periods of heightened instability.
+This project aims to contribute to the literature by providing a rigorous comparison between econometric and machine-learning approaches to volatility forecasting in the presence of armed conflicts. By exploiting high-frequency conflict-event data, the study seeks to clarify whether geopolitical information delivers incremental predictive power beyond standard market indicators, particularly during periods of heightened instability.

@@ -12,11 +12,12 @@ This document discloses how AI tools were used during the development of this pr
 ## What AI Was Used For
 ### Code support 
 AI was used to:
-- suggest refactoring for readability (naming, modularization, removing redundancy);
-- propose defensive programming patterns (early checks, handling missing columns, avoiding silent parsing errors);
-- troubleshoot runtime/performance issues in walk-forward evaluation loops (reducing re-fit frequency, reducing repeated computations);
-- suggest numerically stable evaluation practices (handling zeros/near-zeros in volatility forecasts, avoiding invalid logs);
-- format and simplify LaTeX tables and report text to fit Overleaf constraints.
+- suggest refactoring for readability (naming, modularization, removing redundancy)
+- propose defensive programming patterns (early checks, handling missing columns, avoiding silent parsing errors)
+- troubleshoot runtime/performance issues in walk-forward evaluation loops (reducing re-fit frequency, reducing repeated computations)
+- suggest numerically stable evaluation practices (handling zeros/near-zeros in volatility forecasts, avoiding invalid logs)
+- format and simplify LaTeX tables and report text to fit Overleaf constraints
+- connecting Github  
 
 ### Writing support
 AI was used to:

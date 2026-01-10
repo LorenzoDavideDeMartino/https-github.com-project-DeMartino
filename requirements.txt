@@ -1,18 +1,16 @@
-# Data Manipulation
-pandas
-numpy
+The project is implemented in Python 3.11 and relies on the following libraries:
+
+# Data manipulation
+- pandas
+- numpy
 
 # Visualization
-matplotlib
-seaborn
+- matplotlib
 
-# Econometrics (GARCH models)
-arch
+# Econometrics, statistics and ML
+- statsmodels
+- scipy
+- scikit-learn
 
-# Machine Learning & Statistics
-scikit-learn
-xgboost
-statsmodels
-
-# Optional: To read Excel files if needed later
-openpyxl
+# Utilities
+- pathlib (standard library)

@@ -94,7 +94,7 @@ commodity-volatility-conflict/
 │   ├── conflict_loader.py        # Step 2: Conflict data reduction
 │   ├── conflict_index_builder.py # Step 3: Conflict index construction
 │   ├── build_model_dataset.py    # Step 4: Final dataset assembly
-│   ├── models.py                 # Step 5: HAR and HAR-X models (in-sample)
+│   ├── models.py                 # Step 5: HAR and HAR-X models (in-sample), RF
 │   └── evaluation.py             # Step 6: Walk-forward out-of-sample evaluation
 │
 └── results/
@@ -137,7 +137,6 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 
 ### Visualization
 - matplotlib
-- seaborn
 
 ### Econometrics, statistics and ML
 - statsmodels

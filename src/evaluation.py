@@ -163,6 +163,7 @@ def run_walk_forward(
 
     print("\nEvaluation metrics:")
     print(metrics)
+    print(f"\n")
 
     # Export results
 
