@@ -163,6 +163,12 @@ def main():
     
     # STEP 6
     print("----------Step 6----------")
+    print("Note: The out-of-sample evaluation may take approximately 2–3 minutes to run.")
+    print(
+        "Please keep the terminal open.\n"
+        "Due to the large number of print statements, the display may appear irregular,\n"
+        "but the computation is running normally.")
+
     print(f"Analysis window restricted from 2015-01-01 to 2024-12-31"
     "(Reducing to have an acceptable computation time)")
 
@@ -171,9 +177,6 @@ def main():
     # Update model every 5 trading days 
     STEP_SIZE_OPTIMIZED = 5 # This drastically reduces computation time without compromising statistical validity.
     
-    # Newey-West Lags for Diebold-Mariano test
-    NW_LAGS = 5 # Set to 5 for robustness against serial correlation in weekly steps.
-
     # Iterate over the datasets created in Step 4
     for name, path in final_files:
         run_walk_forward(
