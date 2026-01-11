@@ -7,7 +7,6 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 # Visualization
 - matplotlib
 - seaborn
-- seaborn
 
 # Econometrics, statistics and ML
 - statsmodels
