@@ -128,7 +128,6 @@ If the project is run fully from scratch, the original UCDP GED file must be dow
 (The original UCDP Georeferenced Event Dataset can be downloaded from the [UCDP download page](https://ucdp.uu.se/downloads/).)
 
 ## Requirements
-
 The project is implemented in Python 3.11 and relies on the following libraries:
 
 ### Data manipulation
@@ -147,4 +146,4 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 - pathlib (standard library)
 
 ## Author
-Lorenzo Davide De Martino  
+Lorenzo Davide De Martino
