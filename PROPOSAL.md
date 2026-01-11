@@ -1,5 +1,4 @@
 # Project Proposal
-
 ## Motivation and Research Question
 
 Commodity markets are highly exposed to geopolitical risk due to their dependence on geographically concentrated production regions. Armed conflicts can disrupt supply chains, increase uncertainty, and generate abrupt changes in price volatility. Accurately forecasting volatility during such periods is therefore crucial for investors, risk managers, and policymakers.
@@ -18,7 +17,7 @@ The analysis combines two main data sources at a daily frequency.
 
 Commodity price data consist of futures prices for WTI crude oil, natural gas, and gold, as well as an aggregated agricultural commodity index (S&P GSCI Agriculture). Futures prices are used instead of spot prices due to their higher liquidity, longer and more continuous historical availability, and their central role in price discovery. Daily log-returns are computed from these prices.
 
-Conflict-related information is drawn from the UCDP Georeferenced Event Dataset (GED). This dataset provides daily, geolocated records of organized violence, including the timing, location, type of violence, and estimated number of fatalities. The daily granularity of the GED allows for precise alignment with financial market data and enables the identification of volatility responses around conflict onsets.
+Conflict-related information is drawn from the UCDP Georeferenced Event Dataset (GED). This dataset provides daily, geolocated records of organized violence, including the timing, location, type of violence, and estimated number of fatalities. The daily granularity of the GED allows for precise alignment with financial market data and enables the identification of volatility responses around conflicts.
 
 The primary target variable is realized volatility, constructed as the sum of squared daily returns over a rolling 21-day window. This measure serves as an ex post proxy for market risk and as the benchmark against which volatility forecasts are evaluated.
 
