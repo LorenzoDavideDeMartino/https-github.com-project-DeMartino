@@ -6,6 +6,7 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 
 # Visualization
 - matplotlib
+- seaborn
 
 # Econometrics, statistics and ML
 - statsmodels
@@ -13,4 +14,4 @@ The project is implemented in Python 3.11 and relies on the following libraries:
 - scikit-learn
 
 # Utilities
-- pathlib (standard library)
+- pathlib
