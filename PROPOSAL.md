@@ -7,7 +7,7 @@ While existing literature documents that conflicts affect commodity prices and v
 
 This project investigates the following research question:
 
-**Do armed-conflict characteristics contain predictive information that improves out-of-sample forecasts of commodity price volatility?**
+**Do armed-conflict characteristics contain predictive information that improves forecasts of commodity price volatility?**
 
 The goal is to assess whether machine-learning models that incorporate detailed conflict-event information outperform traditional econometric benchmarks in forecasting commodity volatility.
 
