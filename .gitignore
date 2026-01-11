@@ -5,7 +5,6 @@ __pycache__/
 *.pyc
 .DS_Store
 .vscode/
-.env
 .ipynb_checkpoints/
 
 # --- DATA EXCLUSION RULES ---
@@ -22,10 +21,7 @@ data/raw/conflicts/GEDEvent*.csv
 
 # Keep folder structure even if folders are empty
 !data/.gitkeep
-
-# Python caches
-__pycache__/
-*.pyc
+!*.gitkeep
 
 # Environment
 .env
@@ -33,10 +29,8 @@ venv/
 .venv/
 env/
 
-# IDE settings
-.vscode/
+# IDE setting
 .idea/
 
 # OS specific
-.DS_Store
 Thumbs.db
