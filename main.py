@@ -155,7 +155,7 @@ def main():
 
     # STEP 5: ANALYSIS (DIAGNOSTIC)
     print("----------Step 5----------")
-    print("Note: p-values test whether HAR-X provides a statistically significant improvement over HAR.")
+    print("Note: p-values test whether HAR-X provides a statistically significant improvement over HAR")
     print("----In-Sample results-----")
     for name, fpath in final_files:
         if fpath.exists():
@@ -163,11 +163,11 @@ def main():
     
     # STEP 6
     print("----------Step 6----------")
-    print("Note: The out-of-sample evaluation may take approximately 2–3 minutes to run.")
+    print("Note: The out-of-sample evaluation may take approximately 2–3 minutes to run")
     print(
-        "Please keep the terminal open.\n"
+        "Please keep the terminal open\n"
         "Due to the large number of print statements, the display may appear irregular,\n"
-        "but the computation is running normally.")
+        "but the computation is running normally")
 
     print(f"Analysis window restricted from 2015-01-01 to 2024-12-31"
     "(Reducing to have an acceptable computation time)")
