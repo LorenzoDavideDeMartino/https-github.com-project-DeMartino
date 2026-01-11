@@ -12,6 +12,11 @@ __pycache__/
 # 1. IGNORE large conflict files (UCDP dataset exceeds GitHub 100MB limit)
 data/raw/conflicts/*.csv
 data/raw/conflicts/GEDEvent*.csv
+*_clean.csv
+*_features.csv
+*_region.csv
+*_global.csv
+*_dataset.csv
 
 # 2. IGNORE Excel files (often temporary or duplicates)
 *.xlsx
