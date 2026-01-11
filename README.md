@@ -126,7 +126,8 @@ All raw commodity price files used in the project are included in the GitHub rep
 If the project is run fully from scratch, the original UCDP GED file must be downloaded manually from the UCDP website and placed in the directory data/raw/conflicts/. Once the file is available, running python main.py will rebuild the reduced conflict dataset, construct the conflict indices, and reproduce the full analysis pipeline.
 
 (The original UCDP Georeferenced Event Dataset can be downloaded from the [UCDP download page](https://ucdp.uu.se/downloads/).)
-(UCDP Georeferenced Event Dataset (GED), version 25.1) And should be put there: data/raw/conflicts/ 
+(UCDP Georeferenced Event Dataset (GED), version 25.1) 
+And should be put there: data/raw/conflicts/ 
 
 ## Requirements
 The project is implemented in Python 3.11 and relies on the following libraries:
